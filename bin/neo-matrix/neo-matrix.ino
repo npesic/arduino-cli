@@ -86,6 +86,7 @@ if (--x < scrollLen) {
 x = matrix.width();
 if (++pass >= 3){
   pass = 0;
+  matrix.setTextColor(colors[0]);
   return;
 }
 matrix.setTextColor(colors[pass]);

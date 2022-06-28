@@ -1,4 +1,7 @@
 
+./arduino-cli monitor -p /dev/ttyUSB0
+
+./arduino-cli lib install --git-url https://github.com/me-no-dev/ESPAsyncTCP
 
 ./arduino-cli compile --fqbn esp8266:esp8266:nodemcuv2 neo-matrix
 

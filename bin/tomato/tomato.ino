@@ -114,6 +114,7 @@ clockState = 1;
 		display.clearDisplay();
 		display.display();
 		clockState=0;
+		delay(5000);
 		return;
 	}
     }

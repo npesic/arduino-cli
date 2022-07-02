@@ -1,0 +1,15 @@
+OLED display
+	- Voltage: 3.3
+	- RPi pins:
+		- pin 3 (GPIO0) -> SDA
+		- pin 5 (GPIO1) -> SCL
+	- Interface: I2C
+
+PIR (Big cone)
+	- Voltage: 5
+	- Sensor pins
+		- + (next to safeety diode)
+		- OUT (middle pin) - should be 3.3V
+		- -
+
+

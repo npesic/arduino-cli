@@ -1,0 +1,44 @@
+<head></head>
+
+<body>
+    <div id="msg"></div>
+    <div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+    <script>
+        var MAX_X = 800;
+        var MAX_Y = 600;
+        
+	var printQueue = []
+
+	var ctx = document.getElementById('canvas').getContext('2d');
+
+        function draw() {
+            ctx.clearRect(0, 0, 800, 600);
+            
+
+            ctx.save();
+
+            ctx.fillStyle = 'rgba(0, 0, 33, 0.8)';
+            ctx.font = "20px Arial";
+	while (printQueue.length>0){
+		el = printQueue.pop();
+            ctx.fillText(el.text, el.x, el.y);
+	}
+            ctx.restore();
+       }
+
+        window.requestAnimationFrame(draw);
+
+
+        const events = new EventSource('/sub/example/printQueue.json');
+
+        events.onmessage = (event) => {
+            
+	  let payload = JSON.parse(event.data);
+          printQueue.push(payload);
+        window.requestAnimationFrame(draw);
+
+        }
+    </script>
+</body>

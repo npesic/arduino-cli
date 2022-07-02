@@ -1,0 +1,327 @@
+<head></head>
+
+<body>
+    <div id="msg"></div>
+    <div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+    </div>
+    <script>
+        var MAX_X = 800;
+        var MAX_Y = 600;
+        var goolFlag = 0;
+        var playerOne = {
+            whoami: "one",
+            x: 200,
+            y: 300,
+            angle: 90,
+            speed: 0,
+            targetX: 0,
+            targetY: 0
+        };
+        var playerTwo = {
+            whoami: "two",
+            x: 600,
+            y: 300,
+            angle: 90,
+            speed: 0,
+            targetX: 0,
+            targetY: 0
+        };
+        var ball = {
+            whoami: "ball",
+            x: 400,
+            y: 300,
+            angle: 90,
+            speed: 0,
+            targetX: 0,
+            targetY: 0
+        };
+        var goalOne = {
+            whoami: "goalOne",
+            x: 10,
+            y: 300,
+            angle: 90,
+            speed: 0,
+            targetX: 0,
+            targetY: 0
+        };
+        var goalTwo = {
+            whoami: "goalTwo",
+            x: 790,
+            y: 300,
+            angle: 90,
+            speed: 0,
+            targetX: 0,
+            targetY: 0
+        };
+        var ctx = document.getElementById('canvas').getContext('2d');
+
+        function draw() {
+            ctx.clearRect(0, 0, 800, 600);
+            
+
+            ctx.save();
+
+            ctx.translate(playerOne.x, playerOne.y);
+            ctx.rotate(playerOne.angle * Math.PI / 180);
+            //ctx.translate(playerOne.x,-playerOne.y);
+
+            ctx.fillStyle = 'rgba(93, 0, 0, 0.4)';
+            ctx.fillRect(-20, -12, 40, 24);
+            ctx.fillStyle = 'rgba(0, 0, 33, 0.8)';
+            ctx.fillRect(15, -12, 5, 24);
+            ctx.font = "10px Arial";
+            ctx.fillText("01", 0, 0);
+
+            ctx.restore();
+
+            ctx.save();
+
+            ctx.translate(playerTwo.x, playerTwo.y);
+            ctx.rotate(playerTwo.angle * Math.PI / 180);
+
+            ctx.fillStyle = 'rgba(0, 0, 93, 0.4)';
+            ctx.fillRect(-20, -12, 40, 24);
+            ctx.fillStyle = 'rgba(33, 0, 0, 0.8)';
+            ctx.fillRect(15, -12, 5, 24);
+            ctx.font = "10px Arial";
+            ctx.fillText("02", 0, 0);
+
+            ctx.restore();
+
+            ctx.save();
+
+            ctx.translate(ball.x, ball.y);
+            ctx.rotate(ball.angle * Math.PI / 180);
+
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, 20, 0, 2 * Math.PI, false);
+            ctx.fillStyle = 'green';
+            ctx.fill();
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = '#003300';
+            ctx.stroke();
+
+            ctx.restore();
+
+
+            ctx.save();
+
+            ctx.translate(goalOne.x, goalOne.y);
+            ctx.rotate(goalOne.angle * Math.PI / 180);
+
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(-20, -12, 40, 24);
+
+            ctx.restore();
+
+            ctx.save();
+
+            ctx.translate(goalTwo.x, goalTwo.y);
+            ctx.rotate(goalTwo.angle * Math.PI / 180);
+
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(-20, -12, 40, 24);
+
+            ctx.restore();
+        }
+
+        window.requestAnimationFrame(draw);
+
+        function left(player) {
+            player.angle = player.angle - 15;
+            window.requestAnimationFrame(draw);
+        }
+
+        function right(player) {
+            player.angle = player.angle + 15;
+            window.requestAnimationFrame(draw);
+        }
+
+        function isBall(x,y){
+            if((Math.abs(x-ball.x) < 20) && (Math.abs(y-ball.y) < 20)){
+                return true;
+            }
+            return false;
+        }
+
+        function isGool(){
+            if((Math.abs(goalOne.x-ball.x) < 20) && (Math.abs(goalOne.y-ball.y) < 20)){
+                return 2;
+            }
+            if((Math.abs(goalTwo.x-ball.x) < 20) && (Math.abs(goalTwo.y-ball.y) < 20)){
+                return 1;
+            }
+            return 0;
+        }
+
+        function isFreeKick(x,y){
+            if((Math.abs(x-ball.x) < 50) && (Math.abs(y-ball.y) < 45)){
+                return true;
+            }
+            return false;
+        }
+
+        function isFence(x,y){
+            if(x < 10 || x>(MAX_X-10)){
+                return true;
+            }
+            if(y < 10 || y>(MAX_Y-10)){
+                return true;
+            }
+            return false;
+        }
+
+        function getRandomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+
+        function initNewGame(){
+            let rX,rY;
+            rX= getRandomInt(200) - 100;
+            rY= getRandomInt(200) - 100;
+            playerOne.x = 200+rX;
+            playerOne.y = 300+rY;
+
+            rX= getRandomInt(200) - 100;
+            rY= getRandomInt(200) - 100;
+            playerTwo.x = 600+rX;
+            playerTwo.y = 300+rY;
+
+            rX= getRandomInt(200) - 100;
+            rY= getRandomInt(200) - 100;
+            ball.x = 400+rX;
+            ball.y = 300+rY;
+            window.requestAnimationFrame(draw);
+        }
+
+        function gool(score){
+            ctx.clearRect(0, 0, 800, 600);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+
+            ctx.save();
+
+
+                ctx.font = "100px Arial";
+                ctx.fillText("GOOOOOOOL", 100, 200);
+                ctx.fillText(`Player ${score}`, 200, 350);
+
+
+            ctx.restore();
+            goolFlag = 0;
+            setTimeout(initNewGame,5000);
+        }
+
+        function kick(player){
+            if (!isFreeKick(player.x,player.y)){
+                return false;
+            }
+            let rad = player.angle * Math.PI / 180;
+            let targetX = ball.x + Math.cos(rad) * 50;
+            let targetY = ball.y + Math.sin(rad) * 50;
+
+            // if (isFence(targetX,targetY)){
+            //     rad = ((player.angle + 180)%360) * Math.PI / 180;
+            //     targetX = ball.x + Math.cos(rad) * 10;
+            //     targetY = ball.y + Math.sin(rad) * 10;
+            // }
+
+            if (isFence(targetX,targetY)){
+                targetX = ball.x + Math.cos(rad) * 25;
+                targetY = ball.y + Math.sin(rad) * 25;
+                if (isFence(targetX,targetY)){
+                    targetX = ball.x + Math.cos(rad) * 10;
+                    targetY = ball.y + Math.sin(rad) * 10;
+                    if (isFence(targetX,targetY)){
+                        return;
+                    }
+                }  
+            }
+
+            ball.x = targetX;
+            ball.y = targetY;
+
+            goolFlag= isGool();
+            if (goolFlag!==0){
+                window.requestAnimationFrame(gool(goolFlag));
+                return;
+            }
+            window.requestAnimationFrame(draw);
+        }
+
+        function backkick(player){
+            if (!isFreeKick(player.x,player.y)){
+                return false;
+            }
+            let rad = player.angle * Math.PI / 180;
+            let targetX = ball.x - Math.cos(rad) * 50;
+            let targetY = ball.y - Math.sin(rad) * 50;
+
+            player.angle = (player.angle + 180)%360;
+
+            ball.x = targetX;
+            ball.y = targetY;
+
+            let score = isGool();
+            if (score!==0){
+                window.requestAnimationFrame(gool(score));
+                return;
+            }
+            window.requestAnimationFrame(draw);
+        }
+
+        function run(player) {
+
+            let rad = player.angle * Math.PI / 180;
+            let targetX = player.x + Math.cos(rad) * 5;
+            let targetY = player.y + Math.sin(rad) * 5;
+
+            if (isFence(targetX,targetY)){
+                return;
+            }
+
+            if (isBall(targetX,targetY)){
+                return;
+            }
+
+            player.x = targetX;
+            player.y = targetY;
+            window.requestAnimationFrame(draw);
+        }
+
+
+
+
+        const events = new EventSource('/sub/example/player.json');
+
+        events.onmessage = (event) => {
+            if (goolFlag !== 0){
+                return;
+            }
+            let payload = JSON.parse(event.data);
+            let player = playerOne;
+            if (payload.player === "two"){
+                player = playerTwo;
+            }
+            if (payload.op === 'left') {
+                left(player);
+            }
+            if (payload.op === 'right') {
+                right(player);
+            }
+            if (payload.op === 'run') {
+                run(player);
+            }
+            if (payload.op === 'kick') {
+                kick(player);
+            }
+            if (payload.op === 'backkick') {
+                backkick(player);
+            }
+        }
+            ;
+    </script>
+</body>

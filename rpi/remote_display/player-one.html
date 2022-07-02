@@ -1,0 +1,119 @@
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0">
+    <script src="https://head2toes.asuscomm.com/api/fetch.js"></script>
+</head>
+
+<body>
+    <style>
+        .center-screen {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        min-height: 100vh;
+        }
+
+/* CSS */
+.bttn {
+  align-items: center;
+  background-color: rgba(240, 240, 240, 0.26);
+  border: 1px solid #DFDFDF;
+  border-radius: 16px;
+  box-sizing: border-box;
+  color: #000000;
+  cursor: pointer;
+  display: flex;
+  font-family: Inter, sans-serif;
+  font-size: 18px;
+  justify-content: center;
+  line-height: 28px;
+  max-width: 100%;
+  padding: 14px 22px;
+  text-decoration: none;
+  transition: all .2s;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  width: 100%;
+}
+
+.bttn:active,
+.bttn:hover {
+  outline: 0;
+}
+
+.bttn:hover {
+  background-color: #FFFFFF;
+  border-color: rgba(0, 0, 0, 0.19);
+}
+
+@media (min-width: 768px) {
+  .bttn {
+    font-size: 20px;
+    min-width: 200px;
+    padding: 14px 16px;
+  }
+}
+    </style>
+    <div id="msg">
+    </div>
+
+    <div class="center-screen">
+        <div>
+            <button id='run' class="bttn"> - Run - </button>
+            &nbsp;
+        </div>
+        <div  style="padding: 20px">
+        <span>
+            <button id='left' class="bttn"> - Left - </button>
+            &nbsp;
+            <button id='right' class="bttn"> - Right - </button>
+        </span>
+        </div>
+        <div>
+            <button id='kick' class="bttn"> - Kick - </button>
+            &nbsp;
+            <button id='backkick' class="bttn"> - Backkick - </button>
+        </div>
+    </div>
+
+
+    <script>
+        document.getElementById('left').onclick = left;
+        document.getElementById('run').onclick = run;
+        document.getElementById('right').onclick = right;
+        document.getElementById('kick').onclick = kick;
+        document.getElementById('backkick').onclick = backkick;
+        const url = "/sub/example/player.json";
+
+        function left() {
+            doOp('left');
+        }
+
+        function right() {
+            doOp('right');
+        }
+
+        function run() {
+            doOp('run');
+        }
+
+        function kick() {
+            doOp('kick');
+        }
+
+        function backkick() {
+            doOp('backkick');
+        }
+
+        function doOp(op) {
+            let hdrs = {};
+            let payload = `{"op":"${op}","player":"one"}`;
+            try {
+                put(url, payload, hdrs);
+            } catch (err) {
+                console.log(err);
+            }
+        }
+    </script>
+</body>

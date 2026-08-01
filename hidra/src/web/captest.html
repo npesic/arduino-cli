@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HIDRA capability test</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 1rem; max-width: 40rem; }
+  h1 { font-size: 1.2rem; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+  td { border-bottom: 1px solid #ccc; padding: .4rem .3rem; }
+  td:last-child { text-align: right; font-weight: bold; }
+  .yes { color: #0a0; } .no { color: #c00; }
+  button { display: block; width: 100%; padding: .8rem; margin: .4rem 0; font-size: 1rem; }
+  #log { white-space: pre-wrap; background: #f4f4f4; padding: .6rem; font-family: monospace;
+         font-size: 13px; min-height: 6rem; }
+</style>
+</head>
+<body>
+<h1>HIDRA capability test</h1>
+<p>Open this over <b>HTTPS</b> (secure context) on the candidate tablet A, in every browser you
+are willing to ship on. Report the whole table plus the log.</p>
+
+<table id="caps"></table>
+
+<button id="bt">Try Bluetooth chooser (Architecture B)</button>
+<button id="usb">Try USB chooser (Architecture A / WebUSB)</button>
+<button id="ser">Try Serial chooser (Architecture A / Web Serial)</button>
+
+<div id="log">—</div>
+
+<script>
+const log = (...a) => {
+  document.getElementById('log').textContent += '\n' + a.join(' ');
+};
+
+const caps = {
+  'secure context (HTTPS)': isSecureContext,
+  'navigator.bluetooth (Web Bluetooth)': 'bluetooth' in navigator,
+  'navigator.usb (WebUSB)': 'usb' in navigator,
+  'navigator.serial (Web Serial)': 'serial' in navigator,
+  'navigator.hid (WebHID)': 'hid' in navigator,
+  'service worker (PWA offline)': 'serviceWorker' in navigator,
+};
+const t = document.getElementById('caps');
+for (const [k, v] of Object.entries(caps)) {
+  t.insertAdjacentHTML('beforeend',
+    `<tr><td>${k}</td><td class="${v ? 'yes' : 'no'}">${v ? 'YES' : 'NO'}</td></tr>`);
+}
+t.insertAdjacentHTML('beforeend', `<tr><td>userAgent</td><td>${navigator.userAgent}</td></tr>`);
+log('userAgent:', navigator.userAgent);
+
+document.getElementById('bt').onclick = async () => {
+  try {
+    const d = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e'],  // Nordic UART, our control svc
+    });
+    log('BT picked:', d.name, d.id);
+    const s = await d.gatt.connect();
+    log('BT GATT connected:', s.connected);
+  } catch (e) { log('BT error:', e.name, e.message); }
+};
+
+document.getElementById('usb').onclick = async () => {
+  try {
+    const d = await navigator.usb.requestDevice({ filters: [] });
+    log('USB picked:', d.manufacturerName, d.productName,
+        'vid=0x' + d.vendorId.toString(16), 'pid=0x' + d.productId.toString(16));
+    await d.open();
+    log('USB opened, configuration:', d.configuration?.configurationValue);
+    for (const i of d.configuration.interfaces) {
+      const a = i.alternate;
+      log(`  iface ${i.interfaceNumber} class=${a.interfaceClass} sub=${a.interfaceSubclass} proto=${a.interfaceProtocol}`);
+      try { await d.claimInterface(i.interfaceNumber); log(`  iface ${i.interfaceNumber} CLAIMED`); }
+      catch (e) { log(`  iface ${i.interfaceNumber} claim failed:`, e.message); }
+    }
+  } catch (e) { log('USB error:', e.name, e.message); }
+};
+
+document.getElementById('ser').onclick = async () => {
+  try {
+    const p = await navigator.serial.requestPort();
+    log('Serial picked:', JSON.stringify(p.getInfo()));
+    await p.open({ baudRate: 115200 });
+    log('Serial opened OK');
+    await p.close();
+  } catch (e) { log('Serial error:', e.name, e.message); }
+};
+</script>
+</body>
+</html>

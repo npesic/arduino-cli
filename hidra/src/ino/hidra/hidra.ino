@@ -129,6 +129,15 @@ static void releaseAll() {
   pushReport();
 }
 
+// ---------------------------------------------------------------- page
+// page.h is generated from src/web/ by tools/build_page.py and is already gzipped.
+static void sendPage(AsyncWebServerRequest *r) {
+  AsyncWebServerResponse *res =
+      r->beginResponse_P(200, "text/html", INDEX_HTML_GZ, INDEX_HTML_GZ_LEN);
+  res->addHeader("Content-Encoding", "gzip");
+  r->send(res);
+}
+
 // ---------------------------------------------------------------- protocol
 static void reply(const char *s) { ws.textAll(s); }
 
@@ -285,17 +294,13 @@ void setup() {
   // Any hostname resolves here, so a mistyped URL still lands on the keyboard.
   dns.start(53, "*", WiFi.softAPIP());
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *r) {
-    r->send_P(200, "text/html", INDEX_HTML);
-  });
+  server.on("/", HTTP_GET, sendPage);
   // Answer the connectivity probes with "all good" so Fire OS stops nagging about, and
   // deprioritising, an internet-less network.
   server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *r) { r->send(204); });
   server.on("/gen_204", HTTP_GET, [](AsyncWebServerRequest *r) { r->send(204); });
   // DNS points every hostname here, so anything else the browser asks for gets the keyboard.
-  server.onNotFound([](AsyncWebServerRequest *r) {
-    r->send_P(200, "text/html", INDEX_HTML);
-  });
+  server.onNotFound(sendPage);
 
   ws.onEvent(onWsEvent);
   server.addHandler(&ws);

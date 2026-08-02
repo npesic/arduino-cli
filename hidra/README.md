@@ -14,8 +14,11 @@ See [`PLAN.md`](PLAN.md) for the architecture comparison and feasibility work (t
 
 ## Status
 
-Phase 1 — firmware complete, with a minimal built-in test page. The real on-screen keyboard
-(`src/web/`) is Phase 2.
+**Phase 1 — working on hardware.** Validated on an M5StickC Plus with an Amazon Fire HD 10 as
+tablet A: both tablets connect simultaneously and keystrokes reach tablet B.
+
+**Phase 2 — written, not yet tested on hardware.** Full QWERTY touch keyboard in `src/web/`:
+latching modifiers, multi-touch chords, shifted legends, physical-keyboard capture, auto-reconnect.
 
 ## Dependencies
 
@@ -42,10 +45,43 @@ arduino-cli lib install M5StickCPlus ESPAsyncWebServer AsyncTCP
 ## Build and flash
 
 ```bash
+python3 tools/build_page.py          # only after editing src/web/
 ./arduino-cli compile --fqbn esp32:esp32:m5stick-c -e src/ino/hidra
 esptool.py --port /dev/ttyUSB0 write_flash 0x10000 \
     src/ino/hidra/build/esp32.esp32.m5stick-c/hidra.ino.bin
 ```
+
+The keyboard lives in `src/web/` as ordinary HTML/CSS/JS. `tools/build_page.py` inlines it into a
+single gzipped blob and writes `src/ino/hidra/page.h`, which the firmware serves with
+`Content-Encoding: gzip`. **`page.h` is generated — edit `src/web/`, never the header.** The
+generated file is committed, so a plain compile works without running Python.
+
+To preview the layout without flashing, open `src/web/index.html` straight from disk; it renders
+and reports `preview (no device)` instead of trying to connect.
+
+### Verified build
+
+Phase 1 compiles clean on the Raspberry Pi 4 with:
+
+| Component | Version |
+|---|---|
+| `esp32:esp32` core | **1.0.6** |
+| M5StickC-Plus | 0.0.8 |
+| ESP32-BLE-Keyboard | 0.3.2 — **NimBLE mode** (pulls NimBLE-Arduino 1.4.0) |
+| ESPAsyncWebServer | 1.2.3 |
+
+Footprint: **flash 1050194 / 1310720 (80%)**, RAM 49236 bytes global, 278444 free.
+
+Two notes for later:
+
+- **Flash is at 80%** on the default partition scheme, and the Phase 2 keyboard page will be
+  considerably larger than the Phase 1 test page. The stick has 4 MB, so switch partition schemes
+  before that becomes a problem — list the options with
+  `arduino-cli board details --fqbn esp32:esp32:m5stick-c` and append e.g.
+  `:PartitionScheme=huge_app` to the FQBN.
+- **BleKeyboard is already building against NimBLE**, not Bluedroid. That is a happy accident worth
+  keeping: NimBLE is the stack Phase 3 (BLE transport, PLAN.md §C.7) needs for the dual-connection
+  work, so that port is partly done already.
 
 ## Use
 

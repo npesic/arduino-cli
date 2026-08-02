@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#101216">
+<title>HIDRA keyboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="bar">
+  <span class="pill" id="ws">connecting…</span>
+  <span class="pill" id="ble">ble?</span>
+  <span class="pill" id="bat">—</span>
+  <span class="spacer"></span>
+  <button id="capture">capture: off</button>
+  <button id="panic">release all</button>
+</div>
+
+<div id="board"></div>
+
+<script src="keymap.js"></script>
+<script src="transport.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

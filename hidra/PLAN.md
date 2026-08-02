@@ -408,10 +408,15 @@ final answer.
 1. **Phase 1:** `hidra.ino` → `WiFi.softAP()` with NVS-persisted random passphrase, SSID + password +
    QR on the LCD, captive-portal 204 responder, page served from flash, §4 protocol over the
    WebSocket, release-all watchdog. BLE side untouched. **This is a working system.**
+   → **DONE and validated on hardware.** Both tablets connect concurrently; typing works. WiFi
+   SoftAP + BLE HID coexistence on the M5StickC Plus is now measured, not assumed.
 2. **Phase 2:** the real HTML5 keyboard — key grid, sticky modifiers, down/up events, physical
-   keyboard capture — behind `transport.js`.
+   keyboard capture — behind `transport.js`. → **Written**, awaiting hardware test. Page is
+   inlined + gzipped into the firmware by `tools/build_page.py` (14.1 kB → 4.9 kB).
 3. **Phase 3 (optional, v2):** BLE transport. Run the §B.3 gate test; if it passes, add the custom
-   GATT service and the NimBLE port, and let the app pick its transport at runtime.
+   GATT service and let the app pick its transport at runtime. **The NimBLE port is already
+   largely free** — the Phase 1 build shows `ESP32-BLE-Keyboard` 0.3.2 compiling in NimBLE mode
+   against NimBLE-Arduino 1.4.0, so §A.2.3's "budget real time for this" was pessimistic.
 4. **Phase 4:** polish (§5).
 
 Sources: [Chrome 148 Beta for Android adds Web Serial](https://www.notebookcheck.net/Chrome-148-Beta-for-Android-adds-Web-Serial-SharedWorker-support.1269721.0.html) ·

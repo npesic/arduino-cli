@@ -411,7 +411,7 @@ final answer.
    → **DONE and validated on hardware.** Both tablets connect concurrently; typing works. WiFi
    SoftAP + BLE HID coexistence on the M5StickC Plus is now measured, not assumed.
 2. **Phase 2:** the real HTML5 keyboard — key grid, sticky modifiers, down/up events, physical
-   keyboard capture — behind `transport.js`. → **Written**, awaiting hardware test. Page is
+   keyboard capture — behind `transport.js`. → **DONE and validated on hardware.** Page is
    inlined + gzipped into the firmware by `tools/build_page.py` (14.1 kB → 4.9 kB).
 3. **Phase 3 (optional, v2):** BLE transport. Run the §B.3 gate test; if it passes, add the custom
    GATT service and let the app pick its transport at runtime. **The NimBLE port is already

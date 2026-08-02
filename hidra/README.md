@@ -17,8 +17,12 @@ See [`PLAN.md`](PLAN.md) for the architecture comparison and feasibility work (t
 **Phase 1 — working on hardware.** Validated on an M5StickC Plus with an Amazon Fire HD 10 as
 tablet A: both tablets connect simultaneously and keystrokes reach tablet B.
 
-**Phase 2 — written, not yet tested on hardware.** Full QWERTY touch keyboard in `src/web/`:
-latching modifiers, multi-touch chords, shifted legends, physical-keyboard capture, auto-reconnect.
+**Phase 2 — working on hardware.** Full QWERTY touch keyboard in `src/web/`: latching modifiers,
+multi-touch chords, shifted legends, physical-keyboard capture, auto-reconnect. Renders on the
+Fire HD 10 and types on tablet B.
+
+The system is usable end to end. What remains is polish (PLAN.md §5) and the optional BLE
+transport (§C.7 phase 3).
 
 ## Dependencies
 

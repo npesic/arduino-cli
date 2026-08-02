@@ -1,0 +1,2208 @@
+╭─── Claude Code v2.1.220 ─────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                Welcome back Mr. No!                │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ What's new              │
+│                        ▘▘ ▝▝                       │ Bug fixes and reliabil… │
+│  Opus 5 · Claude Pro · nebojsa.pesic@gmail.com's   │ Added Claude Opus 5 (`… │
+│  Organization                                      │ Added `sandbox.network… │
+│              ~/git/arduino-cli/hidra               │ /release-notes for more │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+   Tackle your toughest work with Opus 5. Switch anytime with /model.
+   +1 more · /status
+
+❯ Read PROMPT.md with instructions.                                             
+
+● I'll read the file.
+
+  Read 2 files, listed 1 directory, ran 2 shell commands (ctrl+o to expand)
+
+● Web Search("Web Serial API browser support Android Chrome supported 2026")
+  ⎿  Did 1 search in 6s
+
+● Web Search("WebUSB Android Chrome CH9102 CP210x serial adapter claim interface
+            PWA")
+  ⎿  Did 1 search in 9s
+
+● Write(PLAN.md)
+  ⎿  Wrote 138 lines to PLAN.md
+       1 # HIDRA — Plan & Feasibility (Phase 0)
+       2 
+       3 Goal restated: **Tablet A** (USB-C host) runs an HTML5/PWA keybo
+       4 serial → **M5StickC Plus** (ESP32) → BLE HID keyboard → **Tablet
+          B** (BLE host).
+       5 
+       6 ---
+       8 ## 1. Feasibility verdict
+       9 
+      10 | Link in the chain | Verdict | Notes |
+     … +200 lines (ctrl+o to expand)
+
+● Update(PLAN.md)
+  ⎿  Added 1 line, removed 1 line
+      108    cannot claim the interface, escalate to mitigation ladder st
+           ep 3 (§2).
+      109  
+      110  **Phase 5 — Polish**
+      111 -- Layout config (QWERTY/其他), macros, latency measurement, LC
+          -D niceties, auto-reconnect,                                   
+      111 +- Layout config (QWERTY/AZERTY/etc.), macros, latency measurem
+          +ent, LCD niceties, auto-reconnect,                            
+      112    battery display, README + flashing instructions.
+      113  
+      114  ## 6. Proposed layout
+
+● PROMPT.md asks for phase one only: a detailed plan and feasibility check.
+  Wrote it to hidra/PLAN.md. Summary:
+
+  Verdict: feasible, with one hard constraint. Every link works except
+  browser→USB-serial on a tablet:
+
+  - ESP32 as BLE HID — already proven by your existing sketch.
+  - Swapping WebSocket for serial input — trivial firmware simplification.
+  - The risk: Web Serial is desktop/ChromeOS only. Android support only landed
+  in Chrome 148 beta (April 2026) and is Bluetooth-RFCOMM-first, with USB serial
+  on a limited device set — not something to build on. The dependable Android
+  path is Google's web-serial-polyfill over WebUSB, which Chrome for Android has
+  long supported. It works because stock Android kernels carry no CH9102/CP210x
+  driver, so WebUSB can claim the interface. Write the app against
+  navigator.serial and swap the implementation at runtime.
+  - iPad is disqualified as tablet A — no Web Serial, no WebUSB in Safari. If
+  that's your intended device, the design has to change (fallback: tablet A
+  talks to the stick over Web Bluetooth instead of USB, making the stick
+  BLE-central and HID-peripheral).
+
+  Other things the plan designs around: DTR/RTS auto-reset rebooting the ESP32
+  when the port opens; boot-log garbage on the same UART; BleKeyboard
+  incompatibility with arduino-esp32 core 3.x; PWA needing an HTTPS origin; and
+  no arduino-cli on this x86_64 box (builds happen on the Pi).
+
+  The plan also specifies a line-oriented ASCII protocol at 115200 with explicit
+  key down/up rather than the example's write()-only approach — that's what
+  makes held modifiers, key repeat, and press-and-hold work — plus a release-all
+  watchdog so keys can't stick if the browser dies. Then five phases:
+  hardware/toolchain truth-check → firmware rewrite → web keyboard on desktop →
+  Android/PWA (where the risk lands) → polish.
+
+  Four open questions at the end of the doc; the first one matters most: what is
+  tablet A? Its OS determines whether the §2 risk applies at all.
+
+✻ Crunched for 2m 1s
+
+※ recap: Goal is a browser keyboard on tablet A driving the ESP32 as a BLE HID keyboard for tablet B; I finished the feasibility plan in hidra/PLAN.md. Next I need to know what tablet A is, since iPad rules out the USB approach. (disable recaps in /config)
+
+❯ Read the UPDATE_1.md with alternative arcitecture approach.                   
+
+  Read 1 file (ctrl+o to expand)
+
+● Web Search("Amazon Silk browser Web Bluetooth support Fire tablet Chromium")
+  ⎿  Did 1 search in 7s
+
+● Web Search("ESP32 NimBLE HID keyboard service plus custom GATT service two
+            simultaneous central connections")
+  ⎿  Did 1 search in 11s
+
+● Fetch(https://raw.githubusercontent.com/WebBluetoothCG/registries/master/gatt_
+       blocklist.txt)
+  ⎿  Received 2.8KB (200 OK)
+
+● Web Search("ESP32 BLE maximum simultaneous connections peripheral
+            CONFIG_BT_NIMBLE_MAX_CONNECTIONS advertise while connected")
+  ⎿  Did 1 search in 7s
+
+● Web Search("Amazon Fire HD tablet USB OTG host mode support sideload Chrome
+            browser Fire OS")
+  ⎿  Did 1 search in 8s
+
+● Write(src/web/captest.html)
+  ⎿  Wrote 92 lines to src/web/captest.html
+       1 <!DOCTYPE html>
+       2 <html lang="en">
+       4 <meta charset="utf-8">
+       5 <meta name="viewport" content="width=device-width, initial-scale
+         =1">
+       7 <style>
+       8   body { font: 16px/1.5 system-ui, sans-serif; margin: 1rem; max
+         -width: 40rem; }
+      10   table { border-collapse: collapse; width: 100%; margin-bottom:
+          1rem; }
+     … +96 lines (ctrl+o to expand)
+
+● Now the feasibility findings, appended to the plan:
+● Update(PLAN.md)
+  ⎿  Added 99 lines
+      131     tablet A be relayed too?
+      132  4. Keep WiFi/WebSocket as an optional second transport, or del
+           ete it entirely? (Plan assumes delete.)
+      133  
+      134 +---                                                           
+      135 +                                                              
+      136 +# Appendix A — UPDATE_1: Architecture B (BLE instead of USB se
+          +rial)                                                         
+      137 +                                                              
+      138 +Proposal: drop USB serial; tablet A talks to the stick over **
+          +Web Bluetooth**, and the stick is                             
+      139 +simultaneously a **BLE HID keyboard** for tablet B.           
+      140 +                                                              
+      141 +## A.1 Can the ESP32 serve both tablets at once? — **Yes.**   
+      142 +                                                              
+      143 +The ESP32 is a *single BLE peripheral* holding *one GATT datab
+          +ase* with two services, and both                              
+      144 +tablets connect to it as centrals:                            
+      145 +                                                              
+      146 +```                                                           
+      147 +Tablet A ──BLE (custom control service, plaintext)──┐         
+      148 +                                                    ├── ESP32 
+          +(peripheral, 2 connections)                                   
+      149 +Tablet B ──BLE (HID over GATT 0x1812, bonded)───────┘         
+      150 +```                                                           
+      151 +                                                              
+      152 +- **Connection count:** the ESP32 controller supports up to 9 
+          +concurrent BLE connections;                                   
+      153 +  Espressif recommends ≤3 for stability. We need 2. Comfortabl
+          +e.                                                            
+      154 +- **Advertising:** BLE stops advertising the moment a connecti
+          +on is established. The firmware                               
+      155 +  **must restart advertising in the `onConnect` callback**, ot
+          +herwise the second tablet can never                           
+      156 +  find the device. This is the single most common way this arc
+          +hitecture "doesn't work".                                     
+      157 +- **Per-connection security:** B bonds and encrypts (HOGP requ
+          +ires it); A's control service is left                         
+      158 +  unauthenticated so Web Bluetooth — which cannot drive a pair
+          +ing dialog — can write to it. BLE                             
+      159 +  security is per-connection, so mixing is legal.             
+      160 +- **Advertising payload:** 31 bytes won't hold flags + name + 
+          +appearance + `0x1812` + a 128-bit                             
+      161 +  custom UUID. Put HID (`0x1812` + keyboard appearance) in the
+          + ADV packet and the 128-bit control                           
+      162 +  UUID in the **scan response**; Web Bluetooth's chooser reads
+          + scan responses.                                              
+      163 +                                                              
+      164 +**Control service:** use a Nordic-UART-shaped custom service (
+          +`6e400001-…`), RX characteristic                              
+      165 +`write-without-response`, TX `notify` for status. The §4 line 
+          +protocol carries over verbatim —                              
+      166 +only the transport changes. That is the nice property of this 
+          +pivot: **Phase 2's protocol and                               
+      167 +parser are reusable, only the byte source changes.**          
+      168 +                                                              
+      169 +## A.2 Risks specific to Architecture B                       
+      170 +                                                              
+      171 +1. **Web Bluetooth blocklists HID (0x1812) outright** — "direc
+          +t access to HID devices like keyboards                        
+      172 +   would let web pages become keyloggers". Tablet A therefore 
+          +*cannot* touch the HID service, ever.                         
+      173 +   Harmless here (A only uses the custom service), but it kill
+          +s any simpler variant where the                               
+      174 +   browser drives HOGP directly. It also means the same page c
+          +an never be tested against the HID                            
+      175 +   side.                                                      
+      176 +2. **Tablet A must never bond with the stick in system Bluetoo
+          +th settings.** If it does, Android's                          
+      177 +   HOGP client claims the device as a physical keyboard — tabl
+          +et A would then receive its own                               
+      178 +   keystrokes, and the two stacks fight over the link. Connect
+          + *only* through the Web Bluetooth                             
+      179 +   chooser inside the page. This deserves a warning in the UI.
+      180 +3. **Library rework.** `BleKeyboard` (T-vK) assumes it owns th
+          +e `BLEServer` and the advertising                             
+      181 +   config. Adding a second service and re-advertising on conne
+          +ct means either reaching into its                             
+      182 +   server object or — cleaner — moving to **NimBLE-Arduino** a
+          +nd building the HID service there.                            
+      183 +   NimBLE is also markedly lighter on RAM with 2 connections. 
+          +Budget real time for this.                                    
+      184 +4. **Radio contention & latency.** Two links share one radio. 
+          +Give B (HID) a tight connection                               
+      185 +   interval and A (control) a loose one, so keystroke latency 
+          +lands on the link that matters.                               
+      186 +5. **Powering the stick.** No USB cable means the M5StickC Plu
+          +s runs on its ~120 mAh LiPo — that is                         
+      187 +   roughly an hour or two. In practice it still wants a chargi
+          +ng cable, which erodes the main                               
+      188 +   ergonomic argument for going wireless.                     
+      189 +                                                              
+      190 +## A.3 Architecture A vs B                                    
+      191 +                                                              
+      192 +| | A: USB serial | B: BLE control link |                     
+      193 +|---|---|---|                                                 
+      194 +| Tablet A browser needs | Web Serial *or* WebUSB | Web Blueto
+          +oth |                                                         
+      195 +| Android/Fire OS support | shaky (see §2) | good on Chrome fo
+          +r Android |                                                   
+      196 +| Cabling | USB-C OTG cable | none |                          
+      197 +| Powers the stick | yes | no — battery only |                
+      198 +| Firmware complexity | low (UART reader) | medium (dual conne
+          +ction, re-advertise, NimBLE port) |                           
+      199 +| Failure mode | "can't claim interface" | "second tablet can'
+          +t discover" |                                                 
+      200 +| iPad as tablet A | impossible | still impossible (no Web Blu
+          +etooth in Safari) |                                           
+      201 +                                                              
+      202 +**Recommendation: B is the better bet for a Fire tablet**, pre
+          +cisely because it sidesteps the                               
+      203 +WebUSB interface-claim gamble, which is the plan's biggest unk
+          +nown. Keep §4's protocol and swap                             
+      204 +`transport.js`; that is a one-file change on the web side.    
+      205 +                                                              
+      206 +## A.4 Can tablet A be an Amazon Fire tablet? — **Probably, bu
+          +t only after an empirical test.**                             
+      207 +                                                              
+      208 +- Fire OS is Android-derived and Silk is Chromium-based, but *
+          +*Amazon documents no support for Web                          
+      209 +  Bluetooth, WebUSB, or Web Serial in Silk**, and Amazon strip
+          +s capabilities it doesn't want.                               
+      210 +  Treat Silk as "unknown, assume off" until measured.         
+      211 +- **Chrome sideloading is not a clean escape hatch:** Chrome d
+          +epends on Google Play Services, so                            
+      212 +  you must install the Play Store on Fire OS first, and that s
+          +etup breaks on Fire OS updates. A                             
+      213 +  GMS-independent Chromium build (e.g. Cromite) is the lower-f
+          +riction route if Silk fails.                                  
+      214 +- **Hardware is fine:** current Fire HD 8 / HD 10 / Max 11 hav
+          +e Bluetooth LE, and Fire HD tablets do                        
+      215 +  support USB OTG with an adapter — so Architecture A isn't au
+          +tomatically dead on Fire either. The                          
+      216 +  browser, not the hardware, is the constraint on both paths. 
+      217 +- Web Bluetooth on Android also requires **location permission
+          +** granted to the browser, and scanning                       
+      218 +  fails silently-ish without it. Expect that prompt.          
+      219 +                                                              
+      220 +**The test — run this before writing any more code.** `src/web
+          +/captest.html` (added) prints the                             
+      221 +capability table and opens each chooser. Host it on any HTTPS 
+          +origin (GitHub Pages), then on the                            
+      222 +Fire tablet:                                                  
+      223 +                                                              
+      224 +1. Open it in **Silk** → record the table.                    
+      225 +2. Tap "Try Bluetooth chooser" → does a device chooser appear 
+          +at all?                                                       
+      226 +3. If Silk shows NO across the board, sideload Cromite (or Chr
+          +ome+Play) and repeat.                                         
+      227 +4. Also tap "Try USB chooser" with the M5Stick plugged in via 
+          +OTG — it dumps VID/PID and attempts                           
+      228 +   `claimInterface` on each interface, which settles §2's WebU
+          +SB question at the same time.                                 
+      229 +                                                              
+      230 +That one page resolves both UPDATE_1 questions and the Phase-4
+          + risk in about fifteen minutes with                           
+      231 +the real hardware. Send me the log output and I'll lock the ar
+          +chitecture.                                                   
+      232 +                                                              
+      233  Sources: [Chrome 148 Beta for Android adds Web Serial](https:/
+           /www.notebookcheck.net/Chrome-148-Beta-for-Android-adds-Web-Se
+           rial-SharedWorker-support.1269721.0.html) ·
+      234  [PSA: Web Serial API on Android (blink-dev)](https://groups.go
+           ogle.com/a/chromium.org/g/blink-dev/c/yGhvQ6mEmcY) ·
+      235  [caniuse: Web Serial](https://caniuse.com/web-serial) ·
+
+● Update(PLAN.md)
+  ⎿  Added 6 lines, removed 1 line
+      234  [PSA: Web Serial API on Android (blink-dev)](https://groups.go
+           ogle.com/a/chromium.org/g/blink-dev/c/yGhvQ6mEmcY) ·
+      235  [caniuse: Web Serial](https://caniuse.com/web-serial) ·
+      236  [web-serial-polyfill](https://github.com/google/web-serial-pol
+           yfill) ·
+      237 -[Building a device for WebUSB](https://developer.chrome.com/do
+          -cs/capabilities/build-for-webusb)                             
+      237 +[Building a device for WebUSB](https://developer.chrome.com/do
+          +cs/capabilities/build-for-webusb) ·                           
+      238 +[Web Bluetooth GATT blocklist](https://github.com/WebBluetooth
+          +CG/registries/blob/master/gatt_blocklist.txt) ·               
+      239 +[ESP-IDF BLE multi-connection guide](https://docs.espressif.co
+          +m/projects/esp-idf/en/stable/esp32/api-guides/ble/ble-multicon
+          +nection-guide.html) ·                                         
+      240 +[What is Amazon Silk](https://docs.aws.amazon.com/silk/latest/
+          +developerguide/what-is-silk.html) ·                           
+      241 +[Installing Chrome on a Fire tablet](https://www.howtogeek.com
+          +/how-do-i-install-google-chrome-on-my-amazon-fire-tablet/) ·  
+      242 +[Fire HD 8 USB OTG support (XDA)](https://xdaforums.com/t/fire
+          +-hd-8-tablet-google-play-store-apps-usb-otg-support.3663114/) 
+
+● Feasibility check on UPDATE_1 is written up as Appendix A in hidra/PLAN.md,
+  plus a concrete test page at src/web/captest.html.
+
+  Q1 — Can the ESP32 run a BLE control server and BLE HID together, with both 
+  tablets connected? Yes. It's one peripheral with one GATT database holding two
+  services; both tablets connect as centrals. The controller supports up to 9
+  concurrent connections (Espressif recommends ≤3); we need 2. Three things make
+  or break it:
+
+  - Advertising must be restarted in onConnect — BLE stops advertising on
+  connection, so without this the second tablet can never discover the device.
+  This is the classic failure of this design.
+  - Mixed security per connection: tablet B bonds/encrypts for HOGP, while
+  tablet A's control service stays unauthenticated, because Web Bluetooth can't
+  drive a pairing dialog. That's legal — BLE security is per-connection.
+  - 31-byte advertising limit: HID + appearance in the ADV packet, the 128-bit
+  control UUID in the scan response.
+
+  Two findings worth your attention. Web Bluetooth blocklists the HID service 
+  (0x1812) outright — a page can never touch it, so tablet A must go through a
+  custom Nordic-UART-style service. Fine here, but it kills any simpler variant.
+  And tablet A must never bond with the stick in system Bluetooth settings —
+  Android would claim it as a real keyboard and tablet A would start receiving
+  its own keystrokes.
+
+  Cost: BleKeyboard assumes it owns the server and advertising, so this likely
+  means porting to NimBLE-Arduino. The §4 line protocol and parser carry over
+  unchanged, though — only the byte source changes.
+
+  I'd recommend Architecture B, mainly because it sidesteps the WebUSB
+  interface-claim gamble that was the plan's biggest unknown. The real cost is
+  power: no cable means the stick lives on its ~120 mAh battery.
+
+  Q2 — Amazon Fire as tablet A? Probably, but it needs measuring. Fire OS is
+  Android-derived and Silk is Chromium-based, but Amazon documents no Web
+  Bluetooth/WebUSB/Web Serial support in Silk — assume off until tested.
+  Sideloading Chrome isn't a clean escape (it needs Play Services installed
+  first, and that breaks on Fire OS updates); a GMS-independent Chromium like
+  Cromite is lower-friction. The hardware is fine either way — modern Fire HDs
+  have BLE and do support USB OTG — so the browser, not the tablet, is the
+  constraint on both architectures.
+
+  src/web/captest.html settles it: host it on any HTTPS origin, open it on the
+  Fire tablet in Silk, and it prints the capability table and opens each
+  chooser. The USB button dumps VID/PID and attempts claimInterface on every
+  interface, which answers the Architecture A question at the same time. Fifteen
+  minutes with the real hardware resolves both questions — send me the log and
+  I'll lock the architecture.
+
+  Sources: Web Bluetooth GATT blocklist
+  (https://github.com/WebBluetoothCG/registries/blob/master/gatt_blocklist.txt)
+  · ESP-IDF BLE multi-connection guide (https://docs.espressif.com/projects/esp-
+  idf/en/stable/esp32/api-guides/ble/ble-multiconnection-guide.html) · What is
+  Amazon Silk
+  (https://docs.aws.amazon.com/silk/latest/developerguide/what-is-silk.html) ·
+  Installing Chrome on a Fire tablet (https://www.howtogeek.com/how-do-i-install
+  -google-chrome-on-my-amazon-fire-tablet/) · Fire HD 8 USB OTG support
+  (https://xdaforums.com/t/fire-hd-8-tablet-google-play-store-apps-usb-otg-suppo
+  rt.3663114/)
+
+✻ Baked for 3m 6s
+
+❯ Read captest_results.md with logs.                                            
+
+  Read 1 file (ctrl+o to expand)
+
+● Fetch(https://github.com/google/web-serial-polyfill)
+  ⎿  Received 275.4KB (200 OK)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Fetch(https://raw.githubusercontent.com/google/web-serial-polyfill/main/src/se
+       rial.ts)
+  ⎿  Received 0 bytes (404 Not Found)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Results are decisive. Let me record them and lock the architecture.
+
+● Update(PLAN.md)
+  ⎿  Added 57 lines
+      230  That one page resolves both UPDATE_1 questions and the Phase-4
+            risk in about fifteen minutes with
+      231  the real hardware. Send me the log output and I'll lock the ar
+           chitecture.
+      232  
+      233 +---                                                           
+      234 +                                                              
+      235 +# Appendix B — captest results (measured) → **architecture loc
+          +ked: B (Web Bluetooth)**                                      
+      236 +                                                              
+      237 +Device under test: `KFTRWI` = **Amazon Fire HD 10 (11th gen)**
+          +, Fire OS on Android 9, Chromium 138.                         
+      238 +(UA carries no `Silk/` token — record which browser this actua
+          +lly was, it matters for shipping.)                            
+      239 +                                                              
+      240 +## B.1 What the logs say                                      
+      241 +                                                              
+      242 +| Capability | Result | Consequence |                         
+      243 +|---|---|---|                                                 
+      244 +| Web Bluetooth | **YES — chooser opened, `gatt.connect()` ret
+          +urned `connected: true`** against a real ESP32 (`ESP32-WS-BLE`
+          +) | Architecture B is proven on the actual tablet. |          
+      245 +| WebUSB | **YES — device opened, interface 0 `CLAIMED`** | No
+          + kernel driver contest on Fire OS. §2's biggest fear is dead. 
+          +|                                                             
+      246 +| Web Serial | present, but `requestPort()` only offered a **B
+          +luetooth RFCOMM/SPP** port (`…1101…`), and `open()` failed `Ne
+          +tworkError` | The Android build is the **RFCOMM-only** variant
+          +. Useless for USB. |                                          
+      247 +| WebHID | NO | Irrelevant. |                                 
+      248 +                                                              
+      249 +**Two surprises worth acting on:**                            
+      250 +                                                              
+      251 +1. **The bridge chip is not a CH9102 — it is an FTDI FT232R** 
+          +(`vid=0x403 pid=0x6001`,                                      
+      252 +   `Hades2001 M5stack`, interface class 255 = vendor-specific)
+          +. That breaks the mitigation ladder's                         
+      253 +   step 2: `web-serial-polyfill` hardcodes CDC-ACM (`usbContro
+          +lInterfaceClass: 2`,                                          
+      254 +   `usbTransferInterfaceClass: 10`) and its `findInterface()` 
+          +*throws* when no such interface                               
+      255 +   exists. A class-255 FTDI device will never match. Architect
+          +ure A would therefore need a                                  
+      256 +   hand-written FTDI-over-WebUSB driver (control requests `SET
+          +_BAUDRATE 0x03`, `SET_DATA 0x04`,                             
+      257 +   `MODEM_CTRL 0x01`, plus stripping the 2 status bytes FTDI p
+          +repends to every IN packet). Very                             
+      258 +   doable, but it is a whole extra component to write and debu
+          +g.                                                            
+      259 +2. **Web Serial on Android exists here but only over Bluetooth
+          + SPP.** That hints at an Architecture                         
+      260 +   C — ESP32 Bluetooth Classic SPP to tablet A, BLE HID to tab
+          +let B, using the ESP32's dual-mode                            
+      261 +   radio. Noted for completeness; **not recommended**: BR/EDR 
+          ++ BLE coexistence on ESP32 is                                 
+      262 +   RAM-hungry and historically flaky, and it buys nothing over
+          + B.                                                           
+      263 +                                                              
+      264 +## B.2 Decision                                               
+      265 +                                                              
+      266 +**Go with Architecture B (Web Bluetooth control link).** It is
+          + the only path with a *measured*                              
+      267 +end-to-end success on the target tablet, and it avoids writing
+          + an FTDI WebUSB driver. Architecture A                        
+      268 +stays viable as a fallback — the interface claim works — but i
+          +t now costs a custom driver, an OTG                           
+      269 +cable, and it is unproven past the claim.                     
+      270 +                                                              
+      271 +## B.3 Residual risk (the one thing captest did *not* prove)  
+      272 +                                                              
+      273 +The ESP32 that answered was a plain GATT server. **Still untes
+          +ted: whether Chromium on Fire OS will                         
+      274 +connect to a peripheral that is simultaneously advertising HOG
+          +P (`0x1812`) and bonded to tablet B.**                        
+      275 +That is Appendix A's risks #1 and #2 and it is now the top ope
+          +n item. Phase 1 must test it directly:                        
+      276 +flash a stub that advertises HID + the custom service, bond it
+          + to tablet B, then run captest's                              
+      277 +Bluetooth button on tablet A and confirm the chooser still lis
+          +ts it and `gatt.connect()` still                              
+      278 +succeeds. Everything else is downstream of that answer.       
+      279 +                                                              
+      280 +## B.4 Revised phases                                         
+      281 +                                                              
+      282 +1. **Phase 1 (now):** dual-advertising stub on the M5Stick — H
+          +ID service + custom control service,                          
+      283 +   re-advertise in `onConnect`, HID in ADV / control UUID in s
+          +can response. Bond tablet B, then                             
+      284 +   verify tablet A can still reach it via captest. **Go/no-go 
+          +gate.**                                                       
+      285 +2. **Phase 2:** NimBLE port + §4 protocol parser on the contro
+          +l characteristic → `press/release`.                           
+      286 +3. **Phase 3:** the HTML5 keyboard, `transport.js` implementin
+          +g the Web Bluetooth transport.                                
+      287 +4. **Phase 4:** PWA packaging, offline service worker, install
+          + on the Fire HD 10.                                           
+      288 +5. **Phase 5:** polish (§5, unchanged).                       
+      289 +                                                              
+      290  Sources: [Chrome 148 Beta for Android adds Web Serial](https:/
+           /www.notebookcheck.net/Chrome-148-Beta-for-Android-adds-Web-Se
+           rial-SharedWorker-support.1269721.0.html) ·
+      291  [PSA: Web Serial API on Android (blink-dev)](https://groups.go
+           ogle.com/a/chromium.org/g/blink-dev/c/yGhvQ6mEmcY) ·
+      292  [caniuse: Web Serial](https://caniuse.com/web-serial) ·
+
+  Listed 1 directory, wrote 2 memories (ctrl+o to expand)
+
+● Results are decisive. Written up as Appendix B in PLAN.md.
+
+  Web Bluetooth works — chooser opened and gatt.connect() returned connected: 
+  true against a real ESP32. That's Architecture B proven end-to-end on the
+  actual tablet (KFTRWI = Fire HD 10 11th gen, Chromium 138). Architecture is 
+  locked to B.
+
+  Two surprises in the log that changed the picture:
+
+  Your bridge chip is an FTDI FT232R, not a CH9102 — vid=0x403 pid=0x6001,
+  interface class 255 (vendor-specific). That kills the WebUSB fallback as
+  planned: web-serial-polyfill hardcodes CDC-ACM (usbControlInterfaceClass: 2,
+  usbTransferInterfaceClass: 10) and its findInterface() throws when no matching
+  interface exists. A class-255 device never matches. Architecture A would now
+  need a hand-written FTDI-over-WebUSB driver — baud/data/modem control requests
+  plus stripping the 2 status bytes FTDI prepends to every IN packet. Perfectly
+  doable, but a whole extra component to write and debug, for a path that's
+  still unproven past the claim.
+
+  Web Serial on Android is RFCOMM-only here — requestPort() offered a Bluetooth
+  SPP port (…1101…), not USB, and open() failed. Matches the earlier research:
+  the USB half isn't really there yet.
+
+  The good news buried in the log: WebUSB claimed interface 0 successfully, so
+  Fire OS has no kernel driver fighting you. The §2 interface-claim fear is
+  dead. Architecture A stays a genuine fallback, just an expensive one.
+
+  One thing captest did not prove, and it's now the top risk: the ESP32 that
+  answered was a plain GATT server. Nobody has yet confirmed Chromium on Fire OS
+  will connect to a peripheral that's simultaneously advertising HOGP and
+  bonded to tablet B — Appendix A's risks #1 and #2. Phase 1 is now a go/no-go
+  gate on exactly that: flash a stub advertising HID + the custom service with
+  re-advertise on connect, bond tablet B, then hit captest's Bluetooth button
+  from tablet A. Everything downstream depends on that answer.
+
+  One thing to check on your side: the user agent carries no Silk/ token, so
+  that was probably a sideloaded browser rather than Silk. Worth confirming
+  which — it determines whether shipping this needs a sideload step on every
+  tablet.
+
+  Say the word and I'll write the Phase 1 stub sketch.
+
+✻ Baked for 1m 50s
+
+※ recap: You're building a browser keyboard that drives an ESP32 as a BLE HID keyboard for a second tablet; testing locked the architecture to Web Bluetooth. Next: write the Phase 1 stub sketch advertising HID plus the control service, to confirm both tablets can connect at once. (disable recaps in /config)
+
+❯ Captest was taken on Silk browser version: 138.14.12.0.7204.244.10            
+
+● That's a materially better outcome than expected — no sideloading needed.
+  Updating the plan.
+
+● Update(PLAN.md)
+  ⎿  Added 8 lines, removed 2 lines
+      234  
+      235  # Appendix B — captest results (measured) → **architecture loc
+           ked: B (Web Bluetooth)**
+      236  
+      237 -Device under test: `KFTRWI` = **Amazon Fire HD 10 (11th gen)**
+          -, Fire OS on Android 9, Chromium 138.                         
+      238 -(UA carries no `Silk/` token — record which browser this actua
+          -lly was, it matters for shipping.)                            
+      237 +Device under test: `KFTRWI` = **Amazon Fire HD 10 (11th gen)**
+          +, Fire OS on Android 9.                                       
+      238 +Browser: **Amazon Silk 138.14.12.0.7204.244.10** — i.e. stock 
+          +Silk, on Chromium 138.0.7204.244.                             
+      239 +(The UA omits the `Silk/` token, so UA sniffing cannot detect 
+          +Silk; feature-detect only.)                                   
+      240  
+      241 +**This is the best possible answer to §A.4: no sideloading.** 
+          +Silk ships Web Bluetooth and WebUSB                           
+      242 +enabled, tracks Chromium closely (138 is recent), and updates 
+          +through the normal Amazon channel.                            
+      243 +The whole Play-Store-then-Chrome escape hatch, and the Cromite
+          + fallback, are off the table — drop                           
+      244 +them from the deployment story. The PWA installs from Silk on 
+          +a stock, unmodified Fire tablet.                              
+      245 +                                                              
+      246  ## B.1 What the logs say
+      247  
+      248  | Capability | Result | Consequence |
+
+● Update(PLAN.md)
+  ⎿  Added 5 lines, removed 1 line
+      205  
+      206  ## A.4 Can tablet A be an Amazon Fire tablet? — **Probably, bu
+           t only after an empirical test.**
+      207  
+      208 +> **RESOLVED — see Appendix B. Stock Silk supports both Web Bl
+          +uetooth and WebUSB. Nothing below                             
+      209 +> about sideloading applies; kept only as a record of what was
+          + in question.**                                               
+      210 +                                                              
+      211  - Fire OS is Android-derived and Silk is Chromium-based, but *
+           *Amazon documents no support for Web
+      212    Bluetooth, WebUSB, or Web Serial in Silk**, and Amazon strip
+           s capabilities it doesn't want.
+      210 -  Treat Silk as "unknown, assume off" until measured.         
+      213 +  Treat Silk as "unknown, assume off" until measured. *(Measur
+          +ed: Silk 138 has both. ✅)*                                   
+      214  - **Chrome sideloading is not a clean escape hatch:** Chrome d
+           epends on Google Play Services, so
+      215    you must install the Play Store on Fire OS first, and that s
+           etup breaks on Fire OS updates. A
+      216    GMS-independent Chromium build (e.g. Cromite) is the lower-f
+           riction route if Silk fails.
+      217 +  *(Moot — Silk works.)*                                      
+      218  - **Hardware is fine:** current Fire HD 8 / HD 10 / Max 11 hav
+           e Bluetooth LE, and Fire HD tablets do
+      219    support USB OTG with an adapter — so Architecture A isn't au
+           tomatically dead on Fire either. The
+      220    browser, not the hardware, is the constraint on both paths.
+
+  Wrote 1 memory (ctrl+o to expand)
+
+● That simplifies deployment considerably. Plan and memory updated.
+
+  Stock Silk ships Web Bluetooth and WebUSB enabled — so the entire sideloading
+  branch is gone: no Play Store install, no Chrome APK, no Cromite fallback, and
+  no re-doing any of it after a Fire OS update. The PWA installs from Silk on
+  an unmodified tablet. That was the fragile part of the deployment story and it
+  just evaporated.
+
+  Silk 138.14.12.0.7204.244.10 maps to Chromium 138.0.7204.244, which means
+  Amazon is tracking Chromium closely rather than sitting on an ancient fork —
+  good sign for the feature surviving.
+
+  One practical note I folded into the plan: Silk's UA carries no Silk/ token,
+  so it's indistinguishable from plain Chrome by user agent. Feature-detect
+  capabilities, never UA-sniff — which is what transport.js was going to do
+  anyway.
+
+  Nothing else changes. Architecture B stays locked, and the Phase 1 go/no-go
+  gate is unchanged and still the only real unknown: can Silk reach the ESP32
+  over GATT while that same ESP32 is advertising HOGP and bonded to tablet B.
+
+  Ready to write the Phase 1 stub sketch whenever you want it.
+
+✻ Crunched for 37s
+
+❯ Lets consider one additional architecture: Keep the WS server but instead     
+  running the wifi in client mode start the AP mode and print the wifi password 
+  on the M5Stack's screen. This way we do not need to provide wifi password in  
+  the code. It also would mean that tablet A needs to be connected to this      
+  wifi AP. Please check this approach against current options.                  
+
+● Update(PLAN.md)
+  ⎿  Added 113 lines
+      297  4. **Phase 4:** PWA packaging, offline service worker, install
+            on the Fire HD 10.
+      298  5. **Phase 5:** polish (§5, unchanged).
+      299  
+      300 +---                                                           
+      301 +                                                              
+      302 +# Appendix C — Architecture D: SoftAP + WebSocket (keep the WS
+          + server, drop STA mode)                                       
+      303 +                                                              
+      304 +Proposal: the ESP32 stops joining your WiFi and **becomes** th
+          +e access point. It serves the keyboard                        
+      305 +page and the WebSocket itself; tablet A joins that AP. The pas
+          +sword is generated on-device and shown                        
+      306 +on the LCD, so no credentials live in the source.             
+      307 +                                                              
+      308 +## C.1 Feasibility — **green, and it is the least risky option
+          + on the table**                                               
+      309 +                                                              
+      310 +- **WiFi + BLE coexistence: already proven on this exact board
+          +.** The current sketch runs WiFi STA +                        
+      311 +  AsyncWebServer + `BleKeyboard` simultaneously on the M5Stick
+          +C Plus. SoftAP uses the same radio                            
+      312 +  coexistence machinery as STA, so this is not a new question 
+          +— it is the code you already have,                            
+      313 +  with `WiFi.begin()` swapped for `WiFi.softAP()`.            
+      314 +- **No exotic browser APIs.** WebSocket over `ws://` is univer
+          +sal. No Web Bluetooth, no WebUSB, no                          
+      315 +  Web Serial, no polyfill, no FTDI driver.                    
+      316 +- **BLE stays single-connection.** The ESP32 is a plain HID pe
+          +ripheral to tablet B, exactly as                              
+      317 +  today. `BleKeyboard` needs no changes and **the NimBLE port 
+          +is not required**.                                            
+      318 +- **Serving the page:** embed the HTML/CSS/JS in flash (Little
+          +FS, or PROGMEM for a single-file                              
+      319 +  build). 4 MB of flash against a keyboard page is not a const
+          +raint.                                                        
+      320 +                                                              
+      321 +## C.2 What this kills — and it is a lot                      
+      322 +                                                              
+      323 +**Architecture D removes every open risk in this document**, i
+          +ncluding the Phase-1 go/no-go gate:                           
+      324 +                                                              
+      325 +| Risk | Status under D |                                     
+      326 +|---|---|                                                     
+      327 +| Can Silk reach GATT while the ESP32 advertises HOGP + is bon
+          +ded to B? (§B.3, the gate) | **Gone** — tablet A never touches
+          + BLE. |                                                       
+      328 +| Dual BLE connection, re-advertise on connect, 31-byte ADV bu
+          +dget (§A.1) | **Gone** — one BLE connection. |                
+      329 +| NimBLE port / `BleKeyboard` owns the server (§A.2.3) | **Gon
+          +e** — library used as-is. |                                   
+      330 +| Tablet A accidentally bonding as HOGP and eating its own key
+          +strokes (§A.2.2) | **Gone.** |                                
+      331 +| Web Bluetooth HID blocklist (§A.2.1) | Irrelevant. |        
+      332 +| FTDI FT232R, WebUSB claim, polyfill CDC-ACM mismatch (§B.1) 
+          +| Irrelevant. |                                               
+      333 +| Tablet A must be Chromium | **Gone — iPad/Safari becomes via
+          +ble as tablet A.** |                                          
+      334 +                                                              
+      335 +It also fixes a real security bug in the current sketch: on a 
+          +shared home LAN, *anyone* who can                             
+      336 +reach the ESP32's WebSocket can inject keystrokes into tablet 
+          +B. A password-protected AP makes                              
+      337 +keystroke injection require physical proximity plus the on-scr
+          +een secret.                                                   
+      338 +                                                              
+      339 +## C.3 What it costs                                          
+      340 +                                                              
+      341 +1. **Tablet A loses internet access while connected.** This is
+          + the big one. The Fire HD 10 is                               
+      342 +   WiFi-only — no cellular fallback — so joining the stick's A
+          +P means tablet A is offline for the                           
+      343 +   duration. Fine if tablet A is a dedicated keyboard surface;
+          + painful if it is a general-use                               
+      344 +   tablet. **This single question should decide D vs B.**     
+      345 +2. **Android will fight you about the internet-less network.**
+          + Expect "This network has no internet                         
+      346 +   access — stay connected?" and possible auto-drop. Mitigate 
+          +by answering captive-portal probes                            
+      347 +   (`/generate_204` → HTTP 204) so Fire OS marks the network a
+          +s fine. Optionally hijack DNS to                              
+      348 +   `192.168.4.1` so joining the AP pops the keyboard straight 
+          +up as a captive portal.                                       
+      349 +3. **Power.** SoftAP draws roughly 120–150 mA average versus ~
+          +30–50 mA for BLE-only. Against the                            
+      350 +   M5StickC Plus's ~120 mAh cell that is well under an hour. *
+          +*D effectively requires a power                               
+      351 +   cable** (power-only, from any charger or power bank — no da
+          +ta, so no FTDI concerns).                                     
+      352 +4. **Not a real PWA.** `http://192.168.4.1` is not a secure co
+          +ntext, so no service worker and no                            
+      353 +   proper install. In practice this barely matters — the ESP32
+          + serves the page, so there is nothing                         
+      354 +   to cache for offline — but "add to home screen" degrades to
+          + a plain shortcut. If you want a                              
+      355 +   genuine installable PWA, only B delivers it.               
+      356 +5. **RAM and jitter.** WiFi + Bluedroid + async server togethe
+          +r is the heaviest configuration here,                         
+      357 +   and radio time-slicing adds some latency jitter to both lin
+          +ks. The existing sketch shows it fits;                        
+      358 +   there is just less headroom than under B.                  
+      359 +                                                              
+      360 +## C.4 Nice things D enables                                  
+      361 +                                                              
+      362 +- **QR code join.** The M5 LCD library exposes `M5.Lcd.qrcode(
+          +)`. Render                                                    
+      363 +  `WIFI:S:HIDRA;T:WPA;P:<pass>;;` and tablet A joins by camera
+          +, no typing. Then render a second QR                          
+      364 +  for `http://192.168.4.1/` to open the keyboard. This is a ge
+          +nuinely better onboarding story than                          
+      365 +  anything B offers.                                          
+      366 +- **Rotating credentials.** Generate the passphrase at first b
+          +oot, persist in NVS (`Preferences`),                          
+      367 +  and regenerate on a long-press of Button B. Never in source 
+          +control — which was the stated point.                         
+      368 +- Works from a laptop, a phone, an iPad, anything with a brows
+          +er — useful for debugging.                                    
+      369 +                                                              
+      370 +## C.5 Revised comparison                                     
+      371 +                                                              
+      372 +| | A: USB serial | B: BLE control | **D: SoftAP + WS** |     
+      373 +|---|---|---|---|                                             
+      374 +| Browser requirement | WebUSB + FTDI driver | Web Bluetooth (
+          +Silk ✅) | **any browser** |                                  
+      375 +| Tablet A can be an iPad | ✗ | ✗ | **✓** |                   
+      376 +| Firmware risk | medium (new driver) | **medium-high (NimBLE,
+          + dual conn — unproven)** | **low (existing code)** |          
+      377 +| Open unknowns | 1 (driver) | 1 (the §B.3 gate) | **0** |    
+      378 +| Tablet A keeps internet | ✓ | **✓** | **✗** |               
+      379 +| Stick battery life | ✓ (USB-powered) | **✓ (~hours)** | ✗ (<
+          +1 h, needs cable) |                                           
+      380 +| Real installable PWA | ✓ | **✓** | ✗ |                      
+      381 +| Cabling | data cable to tablet | **none** | power cable (any
+          + source) |                                                    
+      382 +| Keystroke-injection surface | none (wired) | BLE, proximity 
+          +| AP, proximity + password |                                  
+      383 +                                                              
+      384 +## C.6 Recommendation — **build D first, keep B as v2**       
+      385 +                                                              
+      386 +D is the fastest path to a working system and the only option 
+          +with **zero open unknowns**: it is the                        
+      387 +sketch you already have, minus the hardcoded credentials, minu
+          +s the WiFi router. It is a strict                             
+      388 +improvement on the current code, and it delivers exactly what 
+          +you asked for — no password in source.                        
+      389 +                                                              
+      390 +Two things make this safe rather than a detour:               
+      391 +                                                              
+      392 +- **The §4 line protocol is transport-agnostic.** The firmware
+          + parser and the web app's key handling                        
+      393 +  are identical under D and B; only `transport.js` (WebSocket 
+          +vs GATT characteristic) and the                               
+      394 +  firmware's byte source differ. Building D does not throw awa
+          +y work needed for B.                                          
+      395 +- **D de-risks B.** Once D works you have a proven keyboard en
+          +d-to-end, and swapping the transport                          
+      396 +  becomes an isolated experiment you can run against the §B.3 
+          +gate without a broken system.                                 
+      397 +                                                              
+      398 +Switch to B if — and this is the deciding question — **tablet 
+          +A needs its internet while typing**,                          
+      399 +or if the power cable is unacceptable. If tablet A is a dedica
+          +ted keyboard slab, D may simply be the                        
+      400 +final answer.                                                 
+      401 +                                                              
+      402 +## C.7 Revised phases (superseding §B.4)                      
+      403 +                                                              
+      404 +1. **Phase 1:** `hidra.ino` → `WiFi.softAP()` with NVS-persist
+          +ed random passphrase, SSID + password +                       
+      405 +   QR on the LCD, captive-portal 204 responder, page served fr
+          +om flash, §4 protocol over the                                
+      406 +   WebSocket, release-all watchdog. BLE side untouched. **This
+          + is a working system.**                                       
+      407 +2. **Phase 2:** the real HTML5 keyboard — key grid, sticky mod
+          +ifiers, down/up events, physical                              
+      408 +   keyboard capture — behind `transport.js`.                  
+      409 +3. **Phase 3 (optional, v2):** BLE transport. Run the §B.3 gat
+          +e test; if it passes, add the custom                          
+      410 +   GATT service and the NimBLE port, and let the app pick its 
+          +transport at runtime.                                         
+      411 +4. **Phase 4:** polish (§5).                                  
+      412 +                                                              
+      413  Sources: [Chrome 148 Beta for Android adds Web Serial](https:/
+           /www.notebookcheck.net/Chrome-148-Beta-for-Android-adds-Web-Se
+           rial-SharedWorker-support.1269721.0.html) ·
+      414  [PSA: Web Serial API on Android (blink-dev)](https://groups.go
+           ogle.com/a/chromium.org/g/blink-dev/c/yGhvQ6mEmcY) ·
+      415  [caniuse: Web Serial](https://caniuse.com/web-serial) ·
+
+● Update(PLAN.md)  ⎿  Added 5 lines, removed 1 line
+      236  
+      237  ---
+      238  
+      239 -# Appendix B — captest results (measured) → **architecture loc
+          -ked: B (Web Bluetooth)**                                      
+      239 +# Appendix B — captest results (measured) → architecture B (We
+          +b Bluetooth)                                                  
+      240  
+      241 +> **Superseded by Appendix C.** The measurements below stand; 
+          +the *conclusion* does not. Architecture                       
+      242 +> D (SoftAP + WebSocket) has zero open unknowns where B still 
+          +has one, so D is now the build target                         
+      243 +> and B is v2. The capability findings here remain the reason 
+          +B is viable at all.                                           
+      244 +                                                              
+      245  Device under test: `KFTRWI` = **Amazon Fire HD 10 (11th gen)**
+           , Fire OS on Android 9.
+      246  Browser: **Amazon Silk 138.14.12.0.7204.244.10** — i.e. stock 
+           Silk, on Chromium 138.0.7204.244.
+      247  (The UA omits the `Silk/` token, so UA sniffing cannot detect 
+           Silk; feature-detect only.)
+
+● Checked it against the others — written up as Appendix C. Short version: this 
+  is the strongest option, and I'd build it first.
+
+  It's feasible with essentially no new risk. WiFi+BLE coexistence is already
+  proven on this exact board — your current sketch runs WiFi STA +
+  AsyncWebServer + BleKeyboard together. SoftAP uses the same coexistence
+  machinery, so it's the code you already have with WiFi.begin() swapped for
+  WiFi.softAP().
+
+  What makes it compelling is what it deletes. It removes every open risk in the
+  plan, including the Phase-1 go/no-go gate:
+
+  - Tablet A never touches BLE, so the "can Silk reach GATT while the ESP32
+  advertises HOGP and is bonded to B" question disappears entirely.
+  - BLE stays a single connection — no dual-connection juggling, no
+  re-advertise-on-connect, no 31-byte ADV budget, and no NimBLE port.
+  BleKeyboard is used unmodified.
+  - No browser API dependency at all. ws:// is universal — which makes an iPad 
+  viable as tablet A, the only option here that does.
+
+  It also fixes a real security bug in the current sketch: on a shared LAN,
+  anyone who can reach that WebSocket can type into tablet B. An on-screen
+  password makes injection require physical proximity.
+
+  The costs are real but concentrated in one question. Tablet A loses internet
+  while connected — the Fire HD 10 is WiFi-only, so no cellular fallback. That's
+  fine for a dedicated keyboard slab, painful for a general-use tablet, and
+  it's what should decide D vs B. Beyond that: SoftAP draws ~120–150 mA vs
+  ~30–50 mA for BLE, so against a 120 mAh cell it needs a power cable
+  (power-only, any charger). And http://192.168.4.1 isn't a secure context, so
+  no service worker and no true PWA install — though that barely matters since
+  the ESP32 serves the page, so there's nothing to cache. Expect Android to
+  grumble "no internet access"; answering captive-portal probes with a 204
+  settles it.
+
+  Two things your idea enables that I'd take advantage of: the M5 library has
+  M5.Lcd.qrcode(), so render WIFI:S:HIDRA;T:WPA;P:<pass>;; and tablet A joins by
+  camera — better onboarding than anything B offers. And generate the
+  passphrase at first boot into NVS with regeneration on a button long-press, so
+  it's never in git.
+
+  Recommendation: build D now, keep B as v2. It's not a detour — the §4 line
+  protocol is transport-agnostic, so the firmware parser and all the web-side
+  key handling are identical either way; only transport.js changes. And having a
+  working keyboard first turns the B experiment into an isolated test rather
+  than a gamble on a broken system. Phases revised accordingly in §C.7.
+
+  Say the word and I'll write the Phase 1 sketch.
+
+✻ Brewed for 2m 2s
+
+※ recap: Goal is a browser keyboard on tablet A driving the ESP32 as a BLE HID keyboard for tablet B. We compared four architectures and recommended SoftAP plus WebSocket as v1. Next action: write the Phase 1 sketch. (disable recaps in /config)
+
+❯ Write the Phase 1 sketch for the architecture D as described in appendix C    
+
+● Writing the Phase 1 firmware now.
+
+● Write(src/ino/hidra/page.h)
+  ⎿  Wrote 163 lines to src/ino/hidra/page.h
+       1 // Phase 1 test/console page, served from flash at http://192.16
+         8.4.1/
+       2 // Deliberately minimal: it exists to exercise the §4 protocol e
+       3 // The real on-screen keyboard is Phase 2 (src/web/).
+       4 #pragma once
+       5 #include <pgmspace.h>
+       6 
+       8 <!DOCTYPE html>
+       9 <html lang="en">
+      10 <head>
+     … +185 lines (ctrl+o to expand)
+
+● Write(src/ino/hidra/hidra.ino)
+  ⎿  Added 328 lines, removed 87 lines
+        1 +// HIDRA — Phase 1, Architecture D (PLAN.md Appendix C)       
+        2 +//                                                            
+        3 +//   Tablet A ──WiFi (this device's SoftAP) + WebSocket──> M5S
+          +tickC Plus ──BLE HID──> Tablet B                              
+        4 +//                                                            
+        5 +// No WiFi credentials in source: the ESP32 *is* the access po
+          +int, and its passphrase is                                    
+        6 +// generated on first boot, persisted in NVS, and shown on the
+          + LCD as text and as a QR code.                                
+        7 +//                                                            
+        8 +// Protocol (PLAN.md §4) — newline-terminated ASCII over the W
+          +ebSocket:                                                     
+        9 +//   A->ESP   V1                 handshake                    
+       10 +//            D <usage> <mods>   key down, HID usage id (decim
+          +al)                                                           
+       11 +//            U <usage> <mods>   key up                       
+       12 +//            T <text>           type a literal string        
+       13 +//            R                  release everything           
+       14 +//            P                  ping                         
+       15 +//   ESP->A   OK V1  |  S ble=<0|1> batt=<pct>  |  !  |  E <ms
+          +g>                                                            
+       16 +//                                                            
+       17 +// Usages 0xE0..0xE7 are the modifier keys and maintain the mo
+          +difier bitmask themselves, so a                               
+       18 +// client can just send them as ordinary key events. The <mods
+          +> field is honoured only when                                 
+       19 +// <usage> is 0, i.e. "D 0 <mods>" sets the modifier state out
+          +right.                                                        
+       20 +//                                                            
+       21 +// Buttons: A cycles the LCD screens. B (hold 1.5 s) regenerat
+          +es the WiFi passphrase.                                       
+       22 +                                                              
+       23 +#include <M5StickCPlus.h>                                     
+       24  #include <WiFi.h>
+       25 +#include <DNSServer.h>                                        
+       26  #include <ESPAsyncWebServer.h>
+        3 -#include <M5StickCPlus.h>                                     
+       27  #include <BleKeyboard.h>
+        5 -                                                              
+        6 -const char* ssid = "<REPLACE>";                               
+        7 -const char* password =  "<REPLACE>";                          
+        8 -                                                              
+        9 -BleKeyboard bleKeyboard("HIDRA");                             
+       28 +#include <Preferences.h>                                      
+       29 +#include <esp_system.h>                                       
+       30  
+       31 +#include "page.h"                                             
+       32 +                                                              
+       33 +// -----------------------------------------------------------
+          +----- configuration                                           
+       34 +static const char *AP_SSID       = "HIDRA";                   
+       35 +static const char *BLE_NAME      = "HIDRA";                   
+       36 +static const uint8_t AP_CHANNEL  = 6;                         
+       37 +static const uint8_t AP_MAX_CONN = 2;                         
+       38 +static const uint32_t IDLE_RELEASE_MS = 3000;   // release stu
+          +ck keys if the client goes quiet                              
+       39 +static const uint32_t STATUS_MS       = 2000;                 
+       40 +static const uint32_t BTN_HOLD_MS     = 1500;                 
+       41 +                                                              
+       42 +// Flip to 0 if your M5 library revision has no M5.Lcd.qrcode(
+          +).                                                            
+       43 +#define USE_QR 1                                              
+       44 +                                                              
+       45 +// -----------------------------------------------------------
+          +----- globals                                                 
+       46 +BleKeyboard bleKeyboard(BLE_NAME, "HIDRA", 100);              
+       47  AsyncWebServer server(80);
+       48  AsyncWebSocket ws("/ws");
+       13 -                                                              
+       14 -char scrollText[160] = " ";                                   
+       15 -boolean ready = false;                                        
+       49 +DNSServer dns;                                                
+       50 +Preferences prefs;                                            
+       51  
+       17 -void handleWebSocketMessage(void *arg, uint8_t *data, size_t l
+          -en) {                                                         
+       18 -  AwsFrameInfo *info = (AwsFrameInfo*)arg;                    
+       19 -  if (info->final && info->index == 0 && info->len == len && i
+          -nfo->opcode == WS_TEXT) {                                     
+       20 -    data[len] = 0;                                            
+       52 +String apPass;                                                
+       53  
+       22 -    if (len<160 && !ready){                                   
+       23 -        memset(scrollText, '\0', sizeof(scrollText));         
+       24 -        strcpy(scrollText,(char*)data);                       
+       54 +// The HID report we own. BleKeyboard::sendReport() lets us dr
+          +ive real usage ids directly,                                  
+       55 +// which is what makes held modifiers and press-and-hold work 
+          +(the old sketch only had write()).                            
+       56 +KeyReport report = {0, 0, {0, 0, 0, 0, 0, 0}};                
+       57 +                                                              
+       58 +// Messages are parsed on the AsyncTCP task but *acted on* in 
+          +loop(): BLE calls from the async                              
+       59 +// task run on a small stack and have bitten people before.   
+       60 +struct Msg { char text[96]; };                                
+       61 +QueueHandle_t msgq;                                           
+       62 +                                                              
+       63 +uint32_t lastClientMs = 0;                                    
+       64 +uint32_t lastStatusMs = 0;                                    
+       65 +uint32_t btnBDownMs = 0;                                      
+       66 +uint8_t  screenIdx = 0;                                       
+       67 +bool     lastBleState = false;                                
+       68 +                                                              
+       69 +// -----------------------------------------------------------
+          +----- credentials                                             
+       70 +static String makePassphrase() {                              
+       71 +  // No 0/O/1/l/I — this gets read off a 135 px screen.       
+       72 +  static const char alphabet[] = "abcdefghijkmnpqrstuvwxyz2345
+          +6789";                                                        
+       73 +  String s;                                                   
+       74 +  for (int i = 0; i < 10; i++) s += alphabet[esp_random() % (s
+          +izeof(alphabet) - 1)];                                        
+       75 +  return s;                                                   
+       76 +}                                                             
+       77 +                                                              
+       78 +static void loadOrCreatePassphrase(bool forceNew) {           
+       79 +  prefs.begin("hidra", false);                                
+       80 +  apPass = prefs.getString("appass", "");                     
+       81 +  if (forceNew || apPass.length() < 8) {                      
+       82 +    apPass = makePassphrase();                                
+       83 +    prefs.putString("appass", apPass);                        
+       84 +  }                                                           
+       85 +  prefs.end();                                                
+       86 +}                                                             
+       87 +                                                              
+       88 +// -----------------------------------------------------------
+          +----- HID plumbing                                            
+       89 +static bool isModifier(uint8_t usage) { return usage >= 0xE0 &
+          +& usage <= 0xE7; }                                            
+       90 +                                                              
+       91 +static void pushReport() {                                    
+       92 +  if (bleKeyboard.isConnected()) bleKeyboard.sendReport(&repor
+          +t);                                                           
+       93 +}                                                             
+       94 +                                                              
+       95 +static bool anythingHeld() {                                  
+       96 +  if (report.modifiers) return true;                          
+       97 +  for (uint8_t i = 0; i < 6; i++) if (report.keys[i]) return t
+          +rue;                                                          
+       98 +  return false;                                               
+       99 +}                                                             
+      100 +                                                              
+      101 +static void keyDown(uint8_t usage, uint8_t mods) {            
+      102 +  if (usage == 0) { report.modifiers = mods; pushReport(); ret
+          +urn; }                                                        
+      103 +  if (isModifier(usage)) {                                    
+      104 +    report.modifiers |= (1 << (usage - 0xE0));                
+      105 +  } else {                                                    
+      106 +    for (uint8_t i = 0; i < 6; i++) if (report.keys[i] == usag
+          +e) { pushReport(); return; }                                  
+      107 +    for (uint8_t i = 0; i < 6; i++) if (report.keys[i] == 0) {
+          + report.keys[i] = usage; break; }                             
+      108 +    // 6 keys already held: silently drop, matching real keybo
+          +ard rollover behaviour.                                       
+      109 +  }                                                           
+      110 +  pushReport();                                               
+      111 +}                                                             
+      112 +                                                              
+      113 +static void keyUp(uint8_t usage, uint8_t mods) {              
+      114 +  if (usage == 0) { report.modifiers = mods; pushReport(); ret
+          +urn; }                                                        
+      115 +  if (isModifier(usage)) {                                    
+      116 +    report.modifiers &= ~(1 << (usage - 0xE0));               
+      117 +  } else {                                                    
+      118 +    for (uint8_t i = 0; i < 6; i++) if (report.keys[i] == usag
+          +e) report.keys[i] = 0;                                        
+      119 +  }                                                           
+      120 +  pushReport();                                               
+      121 +}                                                             
+      122 +                                                              
+      123 +static void releaseAll() {                                    
+      124 +  report.modifiers = 0;                                       
+      125 +  memset(report.keys, 0, sizeof(report.keys));                
+      126 +  pushReport();                                               
+      127 +}                                                             
+      128 +                                                              
+      129 +// -----------------------------------------------------------
+          +----- protocol                                                
+      130 +static void reply(const char *s) { ws.textAll(s); }           
+      131 +                                                              
+      132 +static void handleLine(char *line) {                          
+      133 +  while (*line == ' ' || *line == '\r') line++;               
+      134 +  if (!*line) return;                                         
+      135 +                                                              
+      136 +  const char cmd = *line;                                     
+      137 +  char *arg = line + 1;                                       
+      138 +  while (*arg == ' ') arg++;                                  
+      139 +                                                              
+      140 +  switch (cmd) {                                              
+      141 +    case 'V':                                                 
+      142 +      reply("OK V1");                                         
+      143 +      break;                                                  
+      144 +                                                              
+      145 +    case 'D':                                                 
+      146 +    case 'U': {                                               
+      147 +      char *end;                                              
+      148 +      long usage = strtol(arg, &end, 10);                     
+      149 +      long mods  = strtol(end, nullptr, 10);                  
+      150 +      if (usage < 0 || usage > 255 || mods < 0 || mods > 255) 
+          +{ reply("E range"); break; }                                  
+      151 +      if (cmd == 'D') keyDown((uint8_t)usage, (uint8_t)mods); 
+      152 +      else            keyUp((uint8_t)usage, (uint8_t)mods);   
+      153 +      break;                                                  
+      154      }
+       26 -    ready = true;                                             
+      155 +                                                              
+      156 +    case 'T':                                                 
+      157 +      if (bleKeyboard.isConnected()) {                        
+      158 +        bleKeyboard.print(arg);                               
+      159 +        pushReport();          // print() clobbers the report;
+          + restore whatever is still held                               
+      160 +      }                                                       
+      161 +      break;                                                  
+      162 +                                                              
+      163 +    case 'R':                                                 
+      164 +      releaseAll();                                           
+      165 +      break;                                                  
+      166 +                                                              
+      167 +    case 'P':                                                 
+      168 +      reply("!");                                             
+      169 +      break;                                                  
+      170 +                                                              
+      171 +    default:                                                  
+      172 +      reply("E cmd");                                         
+      173 +      break;                                                  
+      174    }
+      175  }
+      176  
+      177 +// Split a frame into lines and queue them. Runs on the AsyncT
+          +CP task — no BLE calls here.                                  
+      178 +static void enqueue(const char *data, size_t len) {           
+      179 +  Msg m;                                                      
+      180 +  size_t n = 0;                                               
+      181 +  for (size_t i = 0; i <= len; i++) {                         
+      182 +    const char c = (i < len) ? data[i] : '\n';                
+      183 +    if (c == '\n' || n == sizeof(m.text) - 1) {               
+      184 +      m.text[n] = '\0';                                       
+      185 +      if (n) xQueueSend(msgq, &m, 0);                         
+      186 +      n = 0;                                                  
+      187 +      if (c != '\n') i--;   // line was truncated; resume mid-
+          +line rather than dropping the tail                            
+      188 +    } else {                                                  
+      189 +      m.text[n++] = c;                                        
+      190 +    }                                                         
+      191 +  }                                                           
+      192 +}                                                             
+      193  
+       31 -                                                              
+       32 -void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient *
+          - client, AwsEventType type, void * arg, uint8_t *data, size_t 
+          -len){                                                         
+       33 -                                                              
+       34 -  if(type == WS_EVT_CONNECT){                                 
+       35 -                                                              
+       36 -    Serial.println("Websocket client connection received");   
+       37 -                                                              
+       38 -   } else if(type == WS_EVT_DATA){                            
+       39 -                                                              
+       40 -     handleWebSocketMessage(arg, data, len);                  
+       41 -                                                              
+       42 -   } else if(type == WS_EVT_DISCONNECT){                      
+       43 -                                                              
+       44 -    Serial.println("Client disconnected");                    
+       45 -                                                              
+      194 +static void onWsEvent(AsyncWebSocket *, AsyncWebSocketClient *
+          +client, AwsEventType type,                                    
+      195 +                      void *arg, uint8_t *data, size_t len) { 
+      196 +  if (type == WS_EVT_DATA) {                                  
+      197 +    AwsFrameInfo *info = (AwsFrameInfo *)arg;                 
+      198 +    if (info->final && info->index == 0 && info->len == len &&
+          + info->opcode == WS_TEXT) {                                   
+      199 +      enqueue((const char *)data, len);                       
+      200 +    }                                                         
+      201 +  } else if (type == WS_EVT_DISCONNECT) {                     
+      202 +    Msg m;                                  // drop every key 
+          +the departing client was holding                              
+      203 +    strcpy(m.text, "R");                                      
+      204 +    xQueueSend(msgq, &m, 0);                                  
+      205    }
+      206  }
+       48 -                                                              
+       49 -void setup(){                                                 
+      207 +                                                              
+      208 +// -----------------------------------------------------------
+          +----- LCD                                                     
+      209 +static int batteryPct() {                                     
+      210 +  const float v = M5.Axp.GetBatVoltage();                     
+      211 +  int pct = (int)((v - 3.0f) / (4.07f - 3.0f) * 100.0f);      
+      212 +  return constrain(pct, 0, 100);                              
+      213 +}                                                             
+      214 +                                                              
+      215 +static String joinQrPayload() {                               
+      216 +  return "WIFI:S:" + String(AP_SSID) + ";T:WPA;P:" + apPass + 
+          +";;";                                                         
+      217 +}                                                             
+      218 +                                                              
+      219 +static void drawScreen() {                                    
+      220 +  M5.Lcd.fillScreen(BLACK);                                   
+      221 +  M5.Lcd.setTextSize(1);                                      
+      222 +  M5.Lcd.setCursor(0, 0);                                     
+      223 +                                                              
+      224 +  const bool ble = bleKeyboard.isConnected();                 
+      225 +                                                              
+      226 +  if (screenIdx == 0) {                       // join the AP  
+      227 +#if USE_QR                                                    
+      228 +    M5.Lcd.qrcode(joinQrPayload(), 0, 8, 118, 6);             
+      229 +#endif                                                        
+      230 +    M5.Lcd.setCursor(124, 10);  M5.Lcd.print("JOIN WIFI");    
+      231 +    M5.Lcd.setCursor(124, 30);  M5.Lcd.print("ssid:");        
+      232 +    M5.Lcd.setCursor(124, 42);  M5.Lcd.setTextSize(2); M5.Lcd.
+          +print(AP_SSID);                                               
+      233 +    M5.Lcd.setTextSize(1);                                    
+      234 +    M5.Lcd.setCursor(124, 66);  M5.Lcd.print("pass:");        
+      235 +    M5.Lcd.setCursor(124, 78);  M5.Lcd.setTextSize(2); M5.Lcd.
+          +print(apPass);                                                
+      236 +    M5.Lcd.setTextSize(1);                                    
+      237 +    M5.Lcd.setCursor(124, 104); M5.Lcd.print(ble ? "BLE: paire
+          +d" : "BLE: waiting");                                         
+      238 +  } else if (screenIdx == 1) {                // open the keyb
+          +oard                                                          
+      239 +#if USE_QR                                                    
+      240 +    M5.Lcd.qrcode("http://192.168.4.1/", 0, 8, 118, 3);       
+      241 +#endif                                                        
+      242 +    M5.Lcd.setCursor(124, 10);  M5.Lcd.print("OPEN PAGE");    
+      243 +    M5.Lcd.setCursor(124, 34);  M5.Lcd.setTextSize(2); M5.Lcd.
+          +print("192.168");                                             
+      244 +    M5.Lcd.setCursor(124, 54);  M5.Lcd.print(".4.1");         
+      245 +    M5.Lcd.setTextSize(1);                                    
+      246 +    M5.Lcd.setCursor(124, 84);  M5.Lcd.print("after joining");
+      247 +    M5.Lcd.setCursor(124, 96);  M5.Lcd.print("the HIDRA AP"); 
+      248 +  } else {                                    // status       
+      249 +    M5.Lcd.setTextSize(2);                                    
+      250 +    M5.Lcd.setCursor(4, 6);   M5.Lcd.print("HIDRA");          
+      251 +    M5.Lcd.setTextSize(1);                                    
+      252 +    M5.Lcd.setCursor(4, 34);  M5.Lcd.printf("BLE     : %s", bl
+          +e ? "paired" : "waiting");                                    
+      253 +    M5.Lcd.setCursor(4, 48);  M5.Lcd.printf("wifi cli: %d", Wi
+          +Fi.softAPgetStationNum());                                    
+      254 +    M5.Lcd.setCursor(4, 62);  M5.Lcd.printf("ws cli  : %d", ws
+          +.count());                                                    
+      255 +    M5.Lcd.setCursor(4, 76);  M5.Lcd.printf("battery : %d%%", 
+          +batteryPct());                                                
+      256 +    M5.Lcd.setCursor(4, 90);  M5.Lcd.printf("mods=%02X keys=%0
+          +2X %02X %02X",                                                
+      257 +                                            report.modifiers, 
+          +report.keys[0],                                               
+      258 +                                            report.keys[1], re
+          +port.keys[2]);                                                
+      259 +    M5.Lcd.setCursor(4, 112); M5.Lcd.print("A: screens  B(hold
+          +): new pass");                                                
+      260 +  }                                                           
+      261 +}                                                             
+      262 +                                                              
+      263 +// -----------------------------------------------------------
+          +----- setup / loop                                            
+      264 +void setup() {                                                
+      265    M5.begin();
+       51 -  M5.Lcd.setTextSize(2);                                      
+      266    M5.Lcd.setRotation(3);
+       53 -    M5.Lcd.println("WS BLE HID");                             
+       54 -  Serial.begin(9600);                                         
+       55 -                                                              
+       56 -  WiFi.begin(ssid, password);                                 
+       57 -  M5.lcd.print("Connecting");                                 
+       58 -                                                              
+       59 -  while (WiFi.status() != WL_CONNECTED) {                     
+       60 -    delay(1000);                                              
+       61 -    Serial.println("Connecting to WiFi..");                   
+       62 -    M5.lcd.print(".");                                        
+       63 -  }                                                           
+      267 +  M5.Lcd.fillScreen(BLACK);                                   
+      268 +  M5.Lcd.setTextSize(2);                                      
+      269 +  M5.Lcd.println("HIDRA booting");                            
+      270  
+       65 -  Serial.println("Starting BLE work!");                       
+       66 -  bleKeyboard.begin();                                        
+      271 +  Serial.begin(115200);                                       
+      272  
+       68 -  Serial.println(WiFi.localIP());                             
+       69 -  M5.lcd.println(".");                                        
+       70 -  M5.lcd.println(WiFi.localIP());                             
+      273 +  msgq = xQueueCreate(16, sizeof(Msg));                       
+      274  
+      275 +  loadOrCreatePassphrase(false);                              
+      276 +                                                              
+      277 +  WiFi.mode(WIFI_AP);                                         
+      278 +  WiFi.softAP(AP_SSID, apPass.c_str(), AP_CHANNEL, /*hidden=*/
+          +0, AP_MAX_CONN);                                              
+      279 +  Serial.printf("AP %s / %s at %s\n", AP_SSID, apPass.c_str(),
+      280 +                WiFi.softAPIP().toString().c_str());          
+      281 +                                                              
+      282 +  // Any hostname resolves here, so a mistyped URL still lands
+          + on the keyboard.                                             
+      283 +  dns.start(53, "*", WiFi.softAPIP());                        
+      284 +                                                              
+      285 +  server.on("/", HTTP_GET, [](AsyncWebServerRequest *r) {     
+      286 +    r->send_P(200, "text/html", INDEX_HTML);                  
+      287 +  });                                                         
+      288 +  // Answer the connectivity probes with "all good" so Fire OS
+          + stops nagging about, and                                     
+      289 +  // deprioritising, an internet-less network.                
+      290 +  server.on("/generate_204", HTTP_GET, [](AsyncWebServerReques
+          +t *r) { r->send(204); });                                     
+      291 +  server.on("/gen_204", HTTP_GET, [](AsyncWebServerRequest *r)
+          + { r->send(204); });                                          
+      292 +  server.onNotFound([](AsyncWebServerRequest *r) { r->send(204
+          +); });                                                        
+      293 +                                                              
+      294    ws.onEvent(onWsEvent);
+      295    server.addHandler(&ws);
+       74 -                                                              
+      296    server.begin();
+      297 +                                                              
+      298 +  bleKeyboard.begin();                                        
+      299 +                                                              
+      300 +  lastClientMs = millis();                                    
+      301 +  drawScreen();                                               
+      302  }
+       77 -                                                              
+       78 -void loop(){                                                  
+      303  
+       80 -  boolean ctr = false;                                        
+       81 -  boolean alt = false;                                        
+       82 -                                                              
+       83 -  if (ready){                                                 
+       84 -    ws.textAll(scrollText);                                   
+       85 -    ready = false;                                            
+       86 -    if (strcmp((char*)scrollText, "esc") == 0) {              
+       87 -      bleKeyboard.write(KEY_ESC);                             
+       88 -    } else if (strcmp(scrollText, "tab") == 0) {              
+       89 -      bleKeyboard.write(KEY_TAB);                             
+       90 -    } else if (strcmp(scrollText, "up") == 0) {               
+       91 -      bleKeyboard.write(KEY_UP_ARROW);                        
+       92 -    } else if (strcmp(scrollText, "down") == 0) {             
+       93 -      bleKeyboard.write(KEY_DOWN_ARROW);                      
+       94 -    } else if (strcmp(scrollText, "left") == 0) {             
+       95 -      bleKeyboard.write(KEY_LEFT_ARROW);                      
+       96 -    } else if (strcmp(scrollText, "right") == 0) {            
+       97 -      bleKeyboard.write(KEY_RIGHT_ARROW);                     
+       98 -    } else if (strcmp(scrollText, "ctr") == 0) {              
+       99 -      bleKeyboard.press(KEY_LEFT_CTRL);                       
+      100 -      ctr = true;                                             
+      101 -    } else if (strcmp(scrollText, "alt") == 0) {              
+      102 -      bleKeyboard.press(KEY_LEFT_ALT);                        
+      103 -      alt = true;                                             
+      104 -    } else {                                                  
+      105 -        M5.lcd.fillScreen(BLACK);                             
+      106 -        M5.lcd.setCursor(0,10);                               
+      107 -        bleKeyboard.print(scrollText);                        
+      108 -        bleKeyboard.releaseAll();                             
+      109 -        alt = false;                                          
+      110 -        ctr = false;                                          
+      304 +void loop() {                                                 
+      305 +  M5.update();                                                
+      306 +  dns.processNextRequest();                                   
+      307 +                                                              
+      308 +  Msg m;                                                      
+      309 +  while (xQueueReceive(msgq, &m, 0) == pdTRUE) {              
+      310 +    lastClientMs = millis();                                  
+      311 +    handleLine(m.text);                                       
+      312 +  }                                                           
+      313 +                                                              
+      314 +  // Nothing from the client for a while and keys are still do
+          +wn: let go, or tablet B ends up                               
+      315 +  // with a wedged modifier and an infinite key repeat.       
+      316 +  if (anythingHeld() && millis() - lastClientMs > IDLE_RELEASE
+          +_MS) {                                                        
+      317 +    releaseAll();                                             
+      318 +    Serial.println("watchdog: released all keys");            
+      319 +  }                                                           
+      320 +                                                              
+      321 +  if (millis() - lastStatusMs > STATUS_MS) {                  
+      322 +    lastStatusMs = millis();                                  
+      323 +    char buf[48];                                             
+      324 +    snprintf(buf, sizeof(buf), "S ble=%d batt=%d",            
+      325 +             bleKeyboard.isConnected() ? 1 : 0, batteryPct());
+      326 +    ws.textAll(buf);                                          
+      327 +    ws.cleanupClients();                                      
+      328 +    drawScreen();                                             
+      329 +  }                                                           
+      330 +                                                              
+      331 +  if (bleKeyboard.isConnected() != lastBleState) {            
+      332 +    lastBleState = bleKeyboard.isConnected();                 
+      333 +    drawScreen();                                             
+      334 +  }                                                           
+      335 +                                                              
+      336 +  if (M5.BtnA.wasPressed()) {                                 
+      337 +    screenIdx = (screenIdx + 1) % 3;                          
+      338 +    drawScreen();                                             
+      339 +  }                                                           
+      340 +                                                              
+      341 +  if (M5.BtnB.isPressed()) {                                  
+      342 +    if (btnBDownMs == 0) btnBDownMs = millis();               
+      343 +    if (millis() - btnBDownMs > BTN_HOLD_MS) {                
+      344 +      btnBDownMs = 0;                                         
+      345 +      loadOrCreatePassphrase(true);                           
+      346 +      M5.Lcd.fillScreen(BLACK);                               
+      347 +      M5.Lcd.setCursor(4, 40);                                
+      348 +      M5.Lcd.setTextSize(2);                                  
+      349 +      M5.Lcd.print("new passphrase\n rebooting...");          
+      350 +      delay(1200);                                            
+      351 +      ESP.restart();          // simplest way to re-arm the AP
+          + with new credentials                                         
+      352      }
+      112 -    M5.lcd.print(scrollText);                                 
+      353 +  } else {                                                    
+      354 +    btnBDownMs = 0;                                           
+      355    }
+      114 -                                                              
+      356  }
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Both APIs verified against the libraries. Now the build/flash notes:
+
+● Write(README.md)
+  ⎿  Wrote 100 lines to README.md
+       1 # HIDRA
+       2 
+       4 
+       5 **Tablet A** joins the stick's own WiFi access point and opens a
+          keyboard page served from the
+         ordinary BLE keyboard. Keystrokes
+       7 made on A land on B.
+       8 
+         rst boot, stored in NVS, and shown
+      10 on the LCD as text and as a scannable QR code.
+     … +116 lines (ctrl+o to expand)
+
+● Update(README.md)
+  ⎿  Added 1 line
+      50  ## Use
+      51  
+      52  1. Power the stick. **Keep it on a charger** — SoftAP + BLE dra
+          ins the ~120 mAh cell in wellz
+      53 +1. Power the stick. **Keep it on a charger** — SoftAP + BLE dra
+         +ins the ~120 mAh cell in well                                  
+      54     under an hour.
+      55  2. **Tablet B:** pair with `HIDRA` in Bluetooth settings. The L
+          CD shows `BLE: paired`.
+      56  3. **Tablet A:** scan the first QR (or join WiFi `HIDRA` with t
+          he passphrase on screen).
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Update(README.md)
+  ⎿  Removed 1 line
+      49  
+      50  ## Use
+      51  
+      52 -1. Power the stick. **Keep it on a charger** — SoftAP + BLE dra
+         -ins the ~120 mAh cell in wellz                                 
+      52  1. Power the stick. **Keep it on a charger** — SoftAP + BLE dra
+          ins the ~120 mAh cell in well
+      53     under an hour.
+      54  2. **Tablet B:** pair with `HIDRA` in Bluetooth settings. The L
+          CD shows `BLE: paired`.
+
+● Two refinements before handing off — the captive-portal fallback and LCD
+  flicker:
+
+● Update(src/ino/hidra/hidra.ino)
+  ⎿  Added 3 lines
+      27  #include <BleKeyboard.h>
+      28  #include <Preferences.h>
+      29  #include <esp_system.h>
+      30 +#if __has_include(<esp_random.h>)                              
+      31 +#include <esp_random.h>   // moved out of esp_system.h in newer
+         + IDF revisions                                                 
+      32 +#endif                                                         
+      33  
+      34  #include "page.h"
+      35  
+
+● Update(src/ino/hidra/hidra.ino)
+  ⎿  Added 4 lines, removed 1 line
+      292    // deprioritising, an internet-less network.
+      293    server.on("/generate_204", HTTP_GET, [](AsyncWebServerReques
+           t *r) { r->send(204); });
+      294    server.on("/gen_204", HTTP_GET, [](AsyncWebServerRequest *r)
+            { r->send(204); });
+      295 -  server.onNotFound([](AsyncWebServerRequest *r) { r->send(204
+          -); });                                                        
+      295 +  // DNS points every hostname here, so anything else the brow
+          +ser asks for gets the keyboard.                               
+      296 +  server.onNotFound([](AsyncWebServerRequest *r) {            
+      297 +    r->send_P(200, "text/html", INDEX_HTML);                  
+      298 +  });                                                         
+      299  
+      300    ws.onEvent(onWsEvent);
+      301    server.addHandler(&ws);
+
+● Update(src/ino/hidra/hidra.ino)
+  ⎿  Added 3 lines, removed 1 line
+      331               bleKeyboard.isConnected() ? 1 : 0, batteryPct());
+      332      ws.textAll(buf);
+      333      ws.cleanupClients();
+      334 -    drawScreen();                                             
+      334 +    // Only the status screen has live numbers. Redrawing a QR
+          + code twice a minute would just                               
+      335 +    // burn cycles and make the panel flicker.                
+      336 +    if (screenIdx == 2) drawScreen();                         
+      337    }
+      338  
+      339    if (bleKeyboard.isConnected() != lastBleState) {
+
+● Phase 1 firmware is written — three files:
+
+  - src/ino/hidra/hidra.ino — the sketch
+  - src/ino/hidra/page.h — the test page in PROGMEM
+  - README.md — deps, build/flash, usage, protocol
+
+  Important caveat: this is uncompiled. There's no arduino-cli or ESP32
+  toolchain on this box (it's the x86_64 machine, not the Pi), so it needs a
+  build on the Pi before you trust it. I did verify the two library APIs I was
+  least sure of against upstream source: BleKeyboard::sendReport(KeyReport*) is
+  public in BleKeyboard.h:156, and M5Display::qrcode() exists with a const 
+  String& overload.
+
+  Design decisions worth knowing about:
+
+  I drive sendReport() with real HID usage ids rather than BleKeyboard::write().
+  The old sketch could only fire one-shot keys; this maintains an actual key
+  report, so held modifiers, key repeat, press-and-hold, and 6-key rollover all
+  work. Usages 0xE0–0xE7 maintain the modifier bitmask themselves, so the client
+  sends modifiers as ordinary key events.
+
+  WebSocket frames are split into lines and pushed onto a FreeRTOS queue; loop()
+  drains it. No BLE calls happen on the AsyncTCP task — that task has a small
+  stack and BLE work there is a known way to get mysterious crashes. It also
+  fixes a race in the original sketch, which had a single shared scrollText
+  buffer written from the async callback.
+
+  The watchdog releases everything after 3 s of client silence, and a WS
+  disconnect enqueues an R immediately — otherwise a dropped connection leaves
+  tablet B with a stuck modifier and an infinite key repeat. The page pings
+  every 1.5 s to feed it.
+
+  Passphrase is generated from an unambiguous alphabet (no 0/O/1/l/I — you're
+  reading it off a 135 px screen), stored in NVS, shown as text plus a
+  WIFI:S:…;T:WPA;P:…;; QR for camera join. Button A cycles join-QR / URL-QR /
+  status; holding B for 1.5 s regenerates and reboots.
+
+  Connectivity probes (/generate_204) answer 204 so Fire OS doesn't nag or drop
+  the network, while DNS hijacks every hostname and onNotFound serves the
+  keyboard — so any URL typed lands on it.
+
+  One thing to confirm on the Pi: pin the ESP32 core to 2.x. ESP32-BLE-Keyboard
+  doesn't build against core 3.x without a NimBLE fork — and if you later do
+  Phase 3, that same fork is what you'd move to anyway.
+
+✻ Baked for 4m 38s
+
+※ recap: Goal: an M5StickC Plus that bridges a browser keyboard on tablet A to tablet B over BLE HID. Phase 1 firmware for the SoftAP + WebSocket design is written but uncompiled. Next: build and flash it on the Raspberry Pi.
+
+❯ Build was passing: pi@rpi4:~/git/arduino-cli/hidra/src/ino/hidra $            
+  ~/arduino-cli compile --fqbn esp32:esp32:m5stick-c -e                         
+  Sketch uses 1050194 bytes (80%) of program storage space. Maximum is 1310720  
+  bytes.                                                                        
+  Global variables use 49236 bytes (15%) of dynamic memory, leaving 278444      
+  bytes for local variables. Maximum is 327680 bytes.                           
+                                                                                
+  Used library       Version Path                                               
+                                                                                
+  M5StickC-Plus      0.0.8   /home/pi/Arduino/libraries/M5StickC-Plus           
+                                                                                
+  Wire               1.0.1                                                      
+  /home/pi/.arduino15/packages/esp32/hardware/esp32/1.0.6/libraries/Wire        
+  SPI                1.0                                                        
+  /home/pi/.arduino15/packages/esp32/hardware/esp32/1.0.6/libraries/SPI         
+  FS                 1.0                                                        
+  /home/pi/.arduino15/packages/esp32/hardware/esp32/1.0.6/libraries/FS          
+  WiFi               1.0                                                        
+  /home/pi/.arduino15/packages/esp32/hardware/esp32/1.0.6/libraries/WiFi        
+  DNSServer          1.1.0                                                      
+  /home/pi/.arduino15/packages/esp32/hardware/esp32/1.0.6/libraries/DNSServer   
+  ESPAsyncWebServer  1.2.3   /home/pi/Arduino/libraries/ESPAsyncWebServer       
+                                                                                
+  src                        /home/pi/Arduino/libraries/src                     
+                                                                                
+  ESP32-BLE-Keyboard 0.3.2   /home/pi/Arduino/libraries/ESP32-BLE-Keyboard      
+                                                                                
+  NimBLE-Arduino     1.4.0   /home/pi/Arduino/libraries/NimBLE-Arduino          
+                                                                                
+  Preferences        1.0                                                        
+  /home/pi/.arduino15/packages/esp32/hardware/esp32/1.0.6/libraries/Preferences 
+                                                                                
+  Used platform Version Path                                                    
+  esp32:esp32   1.0.6   /home/pi/.arduino15/packages/esp32/hardware/esp32/1.0.6 
+
+● Build's clean. Three things in that log worth acting on.
+
+● Update(README.md)
+  ⎿  Added 24 lines
+      47      src/ino/hidra/build/esp32.esp32.m5stick-c/hidra.ino.bin
+      48  ```
+      49  
+      50 +### Verified build                                             
+      51 +                                                               
+      52 +Phase 1 compiles clean on the Raspberry Pi 4 with:             
+      53 +                                                               
+      54 +| Component | Version |                                        
+      55 +|---|---|                                                      
+      56 +| `esp32:esp32` core | **1.0.6** |                             
+      57 +| M5StickC-Plus | 0.0.8 |                                      
+      58 +| ESP32-BLE-Keyboard | 0.3.2 — **NimBLE mode** (pulls NimBLE-Ar
+         +duino 1.4.0) |                                                 
+      59 +| ESPAsyncWebServer | 1.2.3 |                                  
+      60 +                                                               
+      61 +Footprint: **flash 1050194 / 1310720 (80%)**, RAM 49236 bytes g
+         +lobal, 278444 free.                                            
+      62 +                                                               
+      63 +Two notes for later:                                           
+      64 +                                                               
+      65 +- **Flash is at 80%** on the default partition scheme, and the 
+         +Phase 2 keyboard page will be                                  
+      66 +  considerably larger than the Phase 1 test page. The stick has
+         + 4 MB, so switch partition schemes                             
+      67 +  before that becomes a problem — list the options with        
+      68 +  `arduino-cli board details --fqbn esp32:esp32:m5stick-c` and 
+         +append e.g.                                                    
+      69 +  `:PartitionScheme=huge_app` to the FQBN.                     
+      70 +- **BleKeyboard is already building against NimBLE**, not Blued
+         +roid. That is a happy accident worth                           
+      71 +  keeping: NimBLE is the stack Phase 3 (BLE transport, PLAN.md 
+         +§C.7) needs for the dual-connection                            
+      72 +  work, so that port is partly done already.                   
+      73 +                                                               
+      74  ## Use
+      75  
+      76  1. Power the stick. **Keep it on a charger** — SoftAP + BLE dra
+          ins the ~120 mAh cell in well
+
+● Update(PLAN.md)
+  ⎿  Added 3 lines, removed 1 line
+      411  2. **Phase 2:** the real HTML5 keyboard — key grid, sticky mod
+           ifiers, down/up events, physical
+      412     keyboard capture — behind `transport.js`.
+      413  3. **Phase 3 (optional, v2):** BLE transport. Run the §B.3 gat
+           e test; if it passes, add the custom
+      414 -   GATT service and the NimBLE port, and let the app pick its 
+          -transport at runtime.                                         
+      414 +   GATT service and let the app pick its transport at runtime.
+          + **The NimBLE port is already                                 
+      415 +   largely free** — the Phase 1 build shows `ESP32-BLE-Keyboar
+          +d` 0.3.2 compiling in NimBLE mode                             
+      416 +   against NimBLE-Arduino 1.4.0, so §A.2.3's "budget real time
+          + for this" was pessimistic.                                   
+      417  4. **Phase 4:** polish (§5).
+      418  
+      419  Sources: [Chrome 148 Beta for Android adds Web Serial](https:/
+           /www.notebookcheck.net/Chrome-148-Beta-for-Android-adds-Web-Se
+           rial-SharedWorker-support.1269721.0.html) ·
+● Good — 80% flash, 15% RAM, and it links. Three observations from that log:
+
+  1. ESP32-BLE-Keyboard is building in NimBLE mode. NimBLE-Arduino 1.4.0 appears
+  in the used-library list, which means the #if defined(USE_NIMBLE) branch
+  resolved. That's a genuine windfall: NimBLE is exactly the stack Phase 3's
+  dual-connection work needs, so Appendix A's "budget real time for the NimBLE
+  port" was pessimistic — most of it is already done. I've corrected that in the
+  plan.
+
+  2. Flash is at 80% and the Phase 2 page will be much bigger than the minimal
+  test page. You have 4 MB on the stick, so it's just a partition-scheme change
+  — arduino-cli board details --fqbn esp32:esp32:m5stick-c to list options, then
+  append something like :PartitionScheme=huge_app to the FQBN. Worth doing
+  before Phase 2 rather than when the link fails.
+
+  3. There's a stray library at /home/pi/Arduino/libraries/src. That's almost
+  certainly a mis-unzipped library — someone extracted a package's inner src/
+  directory straight into libraries/. It's being scanned as a library named
+  "src". Harmless right now, but it's the kind of thing that later shadows a
+  header and produces a baffling error. Worth a look.
+
+  Also note your core is 1.0.6, older than the 2.x I suggested pinning — which
+  is fine here, and moots the core-3.x concern entirely. The
+  __has_include(<esp_random.h>) guard is what kept that working on 1.0.6, where
+  esp_random still lives in esp_system.h.
+
+  Both files updated with the verified build config. Next is flash and bring-up
+  — the order that isolates failures fastest:
+
+  1. Flash, watch serial at 115200 for the AP HIDRA / <pass> at 192.168.4.1
+  line.
+  2. Pair tablet B over Bluetooth first, confirm the LCD flips to BLE: paired.
+  3. Join the AP from tablet A by QR, confirm Fire OS doesn't nag about no
+  internet (that's the 204 responder doing its job).
+  4. Open http://192.168.4.1/, check the status pill goes ws up and battery
+  shows.
+  5. Tap the capture box, type — text should land on tablet B.
+  6. The two things most likely to be wrong: latched Ctrl/Shift (tap Ctrl, tap
+  C, tap Ctrl off — does tablet B see Ctrl+C?), and the watchdog (hold a key,
+  then kill WiFi on tablet A — the key must release within 3 s rather than
+  repeating forever).
+
+  Tell me what breaks and I'll fix it.
+
+✻ Sautéed for 53s
+
+※ recap: We're building HIDRA, a keyboard bridge where a Fire tablet types into a paired tablet via the M5StickC over WiFi AP and BLE HID. Phase 1 firmware compiles clean. Next: flash it and run the bring-up checklist on hardware.
+
+❯ Deployed it, it worked. Both tablets connected and keyboard worked.           
+
+● That's the whole chain working end to end — tablet A → WiFi → WebSocket → BLE
+  HID → tablet B. Recording it:
+
+● Update(README.md)
+  ⎿  Added 3 lines, removed 2 lines
+      14  
+      15  ## Status
+      16  
+      17 -Phase 1 — firmware complete, with a minimal built-in test page.
+         - The real on-screen keyboard                                   
+      18 -(`src/web/`) is Phase 2.                                       
+      17 +**Phase 1 — working on hardware.** Validated on an M5StickC Plu
+         +s with an Amazon Fire HD 10 as                                 
+      18 +tablet A: both tablets connect simultaneously and keystrokes re
+         +ach tablet B. Ships with a minimal                             
+      19 +built-in test page; the real on-screen keyboard (`src/web/`) is
+         + Phase 2.                                                      
+      20  
+      21  ## Dependencies
+      22  
+
+● Update(PLAN.md)
+  ⎿  Added 2 lines
+      408  1. **Phase 1:** `hidra.ino` → `WiFi.softAP()` with NVS-persist
+           ed random passphrase, SSID + password +
+      409     QR on the LCD, captive-portal 204 responder, page served fr
+           om flash, §4 protocol over the
+      410     WebSocket, release-all watchdog. BLE side untouched. **This
+            is a working system.**
+      411 +   → **DONE and validated on hardware.** Both tablets connect 
+          +concurrently; typing works. WiFi                              
+      412 +   SoftAP + BLE HID coexistence on the M5StickC Plus is now me
+          +asured, not assumed.                                          
+      413  2. **Phase 2:** the real HTML5 keyboard — key grid, sticky mod
+           ifiers, down/up events, physical
+      414     keyboard capture — behind `transport.js`.
+      415  3. **Phase 3 (optional, v2):** BLE transport. Run the §B.3 gat
+           e test; if it passes, add the custom
+
+● That's the objective from PROMPT.md met — tablet A drives tablet B as a BLE
+  HID keyboard, with no WiFi credentials in source. Status updated in README.md
+  and PLAN.md.
+
+  Worth noting what that run actually proved beyond "it works": WiFi SoftAP and
+  BLE HID coexisting on the M5StickC Plus is now measured rather than assumed,
+  and the transport-agnostic protocol survived contact with real hardware. Both
+  were real risks on paper.
+
+  Sensible next steps, in the order I'd take them:
+
+  Phase 2 — the real keyboard. The current page is a test harness with twelve
+  buttons and a text box; it isn't something you'd type on. This is a full key
+  grid, proper layout, sticky modifiers, and sensible touch targets, in src/web/
+  behind the same transport.js seam. Bump the partition scheme first — you're
+  at 80% flash and this page will be several times larger.
+
+  Or, before that, a soak test. Worth knowing early: how long the stick actually
+  lasts off a charger under SoftAP, whether the WebSocket survives tablet A's
+  screen sleeping, and whether keystrokes still land after an hour idle. Those
+  shape Phase 2's UI — auto-reconnect and a visible connection state matter a
+  lot more if the link drops routinely.
+
+  Phase 3 (BLE transport) is now optional. It buys tablet A keeping its internet
+  and much better battery life. If the WiFi-only tradeoff isn't bothering you
+  in practice, D may just be the final answer.
+
+  I'd suggest the soak test first — it's cheap and it tells you what Phase 2
+  needs to defend against. Happy to start on either.
+
+✻ Crunched for 21s
+
+❯ Start phase 2                                                                 
+
+● Phase 2 — the real keyboard. Building it as readable sources in src/web/ plus
+  a generator that inlines them into the firmware.
+
+● Write(src/web/keymap.js)
+  ⎿  Wrote 86 lines to src/web/keymap.js
+       1 // HID usage tables and the physical key layout.
+         numbers the firmware puts
+       3 // straight into the report, so nothing here needs to know about
+       4 
+       5 const HIDRA_KEYMAP = (() => {
+       7     Enter: 0x28, Escape: 0x29, Backspace: 0x2A, Tab: 0x2B, Space
+         : 0x2C,
+         x30, Backslash: 0x31,
+       9     Semicolon: 0x33, Quote: 0x34, Backquote: 0x35, Comma: 0x36, 
+      10     CapsLock: 0x39,
+     … +102 lines (ctrl+o to expand)
+
+● Write(src/web/transport.js)
+  ⎿  Wrote 53 lines to src/web/transport.js
+       1 // Transport seam. Everything above this file speaks the PLAN.md
+          §4 line protocol and knows
+         : Phase 3 adds a BleTransport
+       3 // with the same four members (start, send, onStatus, onLine) an
+         d app.js is untouched.
+       5 class WebSocketTransport {
+       6   constructor(url) {
+       7     this.url = url;
+       9     this.up = false;
+      10     this.onStatus = () => {};    // (up: boolean) => void
+     … +47 lines (ctrl+o to expand)
+
+● Write(src/web/app.js)
+  ⎿  Wrote 209 lines to src/web/app.js
+      1 // HIDRA keyboard — Phase 2.
+      2 // Sends explicit key down/up so tablet B does its own shifting, 
+        its own key repeat, and sees
+      3 // real held modifiers. Nothing here interprets characters.
+      4 
+      6   const { U, MODIFIERS, FN_ROW, MAIN_ROWS } = HIDRA_KEYMAP;
+      7   const $ = (id) => document.getElementById(id);
+      8 
+      9   const link = new WebSocketTransport('ws://' + location.host + '
+        /ws');
+     … +220 lines (ctrl+o to expand)
+
+● Write(src/web/style.css)
+  ⎿  Wrote 132 lines to src/web/style.css
+      1 :root {
+      2   color-scheme: dark;
+      3   --bg: #101216;
+      4   --key: #232830;
+      5   --key-edge: #333a45;
+      6   --key-text: #e9edf2;
+      7   --accent: #3fd0a0;
+      8   --gap: 0.32rem;
+      9 }
+     … +134 lines (ctrl+o to expand)
+
+● Write(src/web/index.html)
+  ⎿  Wrote 29 lines to src/web/index.html
+       1 <!DOCTYPE html>
+       2 <html lang="en">
+       3 <head>
+       4 <meta charset="utf-8">
+       5 <meta name="viewport" content="width=device-width, initial-scale
+       6 <meta name="mobile-web-app-capable" content="yes">
+       7 <meta name="apple-mobile-web-app-capable" content="yes">
+       8 <meta name="theme-color" content="#101216">
+       9 <title>HIDRA keyboard</title>
+      10 <link rel="stylesheet" href="style.css">
+     … +20 lines (ctrl+o to expand)
+
+● Update(src/web/style.css)
+  ⎿  Added 2 lines, removed 5 lines
+      103  
+      104  .key.down   { background: var(--accent); color: #06231a; borde
+           r-color: var(--accent); }
+      105  .key.armed  { background: #2c5f4e; border-color: var(--accent)
+           ; }
+      106 -.key.locked { background: var(--accent); color: #06231a; borde
+          -r-color: #7ff0c4; }                                           
+      107 -.key.locked::after {                                          
+      108 -  content: "";                                                
+      109 -  position: absolute;                                         
+      110 -}                                                             
+      106 +.key.locked { background: var(--accent); color: #06231a; borde
+          +r-color: #7ff0c4;                                             
+      107 +              box-shadow: inset 0 0 0 2px #06231a; }          
+      108  
+      109  /* Shifted legends: both are in the DOM, CSS decides which sho
+           ws, so no re-render on Shift. */
+      110  .lbl.alt  { display: none; }
+
+● Now the generator that inlines these into the firmware:
+
+● Write(tools/build_page.py)
+  ⎿  Wrote 85 lines to tools/build_page.py
+       1 #!/usr/bin/env python3
+       2 """Inline src/web/ into a single gzipped page and emit src/ino/h
+       3 
+       4 The firmware serves one blob with Content-Encoding: gzip. Gzippi
+         ng matters here: the sketch
+         page compresses roughly 4x.
+       6 
+       7 Usage:  python3 tools/build_page.py
+       9 
+      10 import gzip
+     … +83 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Inlining verified — ws:// survived the comment stripper, no leftover tags. Now
+  the firmware side:
+
+● Update(src/ino/hidra/hidra.ino)
+  ⎿  Added 1 line, removed 3 lines
+      285    // Any hostname resolves here, so a mistyped URL still lands
+            on the keyboard.
+      286    dns.start(53, "*", WiFi.softAPIP());
+      287  
+      288 -  server.on("/", HTTP_GET, [](AsyncWebServerRequest *r) {     
+      289 -    r->send_P(200, "text/html", INDEX_HTML);                  
+      290 -  });                                                         
+      288 +  server.on("/", HTTP_GET, sendPage);                         
+      289    // Answer the connectivity probes with "all good" so Fire OS
+            stops nagging about, and
+      290    // deprioritising, an internet-less network.
+      291    server.on("/generate_204", HTTP_GET, [](AsyncWebServerReques
+           t *r) { r->send(204); });
+
+● Update(src/ino/hidra/hidra.ino)
+  ⎿  Added 1 line, removed 3 lines
+      291    server.on("/generate_204", HTTP_GET, [](AsyncWebServerReques
+           t *r) { r->send(204); });
+      292    server.on("/gen_204", HTTP_GET, [](AsyncWebServerRequest *r)
+            { r->send(204); });
+      293    // DNS points every hostname here, so anything else the brow
+           ser asks for gets the keyboard.
+      294 -  server.onNotFound([](AsyncWebServerRequest *r) {            
+      295 -    r->send_P(200, "text/html", INDEX_HTML);                  
+      296 -  });                                                         
+      294 +  server.onNotFound(sendPage);                                
+      295  
+      296    ws.onEvent(onWsEvent);
+      297    server.addHandler(&ws);
+● Update(src/ino/hidra/hidra.ino)
+  ⎿  Added 9 lines
+      129    pushReport();
+      130  }
+      131  
+      132 +// -----------------------------------------------------------
+          +----- page                                                    
+      133 +// page.h is generated from src/web/ by tools/build_page.py an
+          +d is already gzipped.                                         
+      134 +static void sendPage(AsyncWebServerRequest *r) {              
+      135 +  AsyncWebServerResponse *res =                               
+      136 +      r->beginResponse_P(200, "text/html", INDEX_HTML_GZ, INDE
+          +X_HTML_GZ_LEN);                                               
+      137 +  res->addHeader("Content-Encoding", "gzip");                 
+      138 +  r->send(res);                                               
+      139 +}                                                             
+      140 +                                                              
+      141  // -----------------------------------------------------------
+           ----- protocol
+      142  static void reply(const char *s) { ws.textAll(s); }
+      143  
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Update(src/web/app.js)
+  ⎿  Added 8 lines, removed 1 line
+      205    document.addEventListener('dblclick', (e) => e.preventDefaul
+           t());
+      206  
+      207    setCapture(false);
+      208 -  link.start();                                               
+      208 +                                                              
+      209 +  if (location.host) {                                        
+      210 +    link.start();                                             
+      211 +  } else {                                                    
+      212 +    // Opened as a file:// URL — there is no device to talk to
+          +. Render anyway so the layout can                             
+      213 +    // be eyeballed without flashing anything.                
+      214 +    $('ws').textContent = 'preview (no device)';              
+      215 +  }                                                           
+      216  })();
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● All three JS files pass node --check. Updating the build docs:
+
+● Update(README.md)
+  ⎿  Added 9 lines
+      43  ## Build and flash
+      44  
+      45  ```bash
+      46 +python3 tools/build_page.py          # only after editing src/w
+         +eb/                                                            
+      47  ./arduino-cli compile --fqbn esp32:esp32:m5stick-c -e src/ino/h
+          idra
+      48  esptool.py --port /dev/ttyUSB0 write_flash 0x10000 \
+      49      src/ino/hidra/build/esp32.esp32.m5stick-c/hidra.ino.bin
+      50  ```
+      51  
+      52 +The keyboard lives in `src/web/` as ordinary HTML/CSS/JS. `tool
+         +s/build_page.py` inlines it into a                             
+      53 +single gzipped blob and writes `src/ino/hidra/page.h`, which th
+         +e firmware serves with                                         
+      54 +`Content-Encoding: gzip`. **`page.h` is generated — edit `src/w
+         +eb/`, never the header.** The                                  
+      55 +generated file is committed, so a plain compile works without r
+         +unning Python.                                                 
+      56 +                                                               
+      57 +To preview the layout without flashing, open `src/web/index.htm
+         +l` straight from disk; it renders                              
+      58 +and reports `preview (no device)` instead of trying to connect.
+      59 +                                                               
+      60  ### Verified build
+      61  
+      62  Phase 1 compiles clean on the Raspberry Pi 4 with:
+
+● Update(README.md)
+  ⎿  Added 4 lines, removed 2 lines
+      15  ## Status
+      16  
+      17  **Phase 1 — working on hardware.** Validated on an M5StickC Plu
+          s with an Amazon Fire HD 10 as
+      18 -tablet A: both tablets connect simultaneously and keystrokes re
+         -ach tablet B. Ships with a minimal                             
+      19 -built-in test page; the real on-screen keyboard (`src/web/`) is
+         - Phase 2.                                                      
+      18 +tablet A: both tablets connect simultaneously and keystrokes re
+         +ach tablet B.                                                  
+      19  
+      20 +**Phase 2 — written, not yet tested on hardware.** Full QWERTY 
+         +touch keyboard in `src/web/`:                                  
+      21 +latching modifiers, multi-touch chords, shifted legends, physic
+         +al-keyboard capture, auto-reconnect.                           
+      22 +                                                               
+      23  ## Dependencies
+      24  
+      25  Board: `esp32:esp32:m5stick-c`. Libraries:
+
+● Update(PLAN.md)
+  ⎿  Added 2 lines, removed 1 line
+      411     → **DONE and validated on hardware.** Both tablets connect 
+           concurrently; typing works. WiFi
+      412     SoftAP + BLE HID coexistence on the M5StickC Plus is now me
+           asured, not assumed.
+      413  2. **Phase 2:** the real HTML5 keyboard — key grid, sticky mod
+           ifiers, down/up events, physical
+      414 -   keyboard capture — behind `transport.js`.                  
+      414 +   keyboard capture — behind `transport.js`. → **Written**, aw
+          +aiting hardware test. Page is                                 
+      415 +   inlined + gzipped into the firmware by `tools/build_page.py
+          +` (14.1 kB → 4.9 kB).                                         
+      416  3. **Phase 3 (optional, v2):** BLE transport. Run the §B.3 gat
+           e test; if it passes, add the custom
+      417     GATT service and let the app pick its transport at runtime.
+            **The NimBLE port is already
+      418     largely free** — the Phase 1 build shows `ESP32-BLE-Keyboar
+           d` 0.3.2 compiling in NimBLE mode
+
+● Phase 2 is written. Six files:
+
+  - src/web/{index.html,style.css,keymap.js,transport.js,app.js} — the keyboard
+  - tools/build_page.py — inlines + gzips them into src/ino/hidra/page.h
+  - hidra.ino — now serves the blob with Content-Encoding: gzip
+
+  Not yet tested on hardware. JS passes node --check, and I decompressed the
+  generated header to confirm the inlining is correct, but nothing has run on a
+  device.
+
+  What it does. Full QWERTY — function row, number row, three letter rows,
+  modifier row, arrow cluster — sized to fill the viewport with no scrolling.
+
+  Latching modifiers. Tap cycles off → one-shot → locked → off, the pattern
+  every touch keyboard uses. One-shot Shift capitalizes exactly one letter, then
+  releases itself. Lock it for CTRL-heavy work. Locked keys get an inset ring
+  so you can tell the two states apart at a glance.
+
+  Multi-touch. Pointer events with pointer capture, so a two-finger Shift+letter
+  chord works as well as the latch.
+
+  Shifted legends are both in the DOM with CSS choosing which to show — pressing
+  Shift doesn't re-render anything.
+
+  Key repeat is free. Because we hold the key down until pointerup, tablet B's
+  own OS generates the repeat. The physical-capture path drops e.repeat events
+  for the same reason.
+
+  Two stuck-key defenses, since that's the failure that actually hurts:
+  backgrounding the tab or hiding the page fires releaseAll(), and a dropped
+  link clears the UI state so it can't lie about what's held. The firmware
+  watchdog remains the backstop.
+
+  On gzip: 14.1 kB → 4.9 kB, so the page costs about the same flash as the Phase
+  1 test page it replaces. The partition bump I flagged is no longer urgent —
+  worth knowing before you spend time on it.
+
+  To try the layout before flashing, open src/web/index.html from disk — it
+  renders and shows preview (no device) rather than throwing on the WebSocket.
+
+  When you flash it, the things most worth probing: one-shot Shift releasing
+  after exactly one letter, a two-finger chord, and whether the key sizing
+  actually suits the Fire HD 10 in landscape — that last one I can only guess at
+  from here.
+
+✻ Churned for 4m 2s
+
+※ recap: HIDRA lets a Fire tablet act as a BLE keyboard for a second tablet; Phase 1 works on hardware and Phase 2's full QWERTY page is written but untested. Next: rebuild, flash, and try the keyboard on the tablet.
+
+❯ Deployed it, keyboard renders and typing works on tablet B                    
+
+● Update(README.md)
+  ⎿  Added 6 lines, removed 2 lines
+      17  **Phase 1 — working on hardware.** Validated on an M5StickC Plu
+          s with an Amazon Fire HD 10 as
+      18  tablet A: both tablets connect simultaneously and keystrokes re
+          ach tablet B.
+      19  
+      20 -**Phase 2 — written, not yet tested on hardware.** Full QWERTY 
+         -touch keyboard in `src/web/`:                                  
+      21 -latching modifiers, multi-touch chords, shifted legends, physic
+         -al-keyboard capture, auto-reconnect.                           
+      20 +**Phase 2 — working on hardware.** Full QWERTY touch keyboard i
+         +n `src/web/`: latching modifiers,                              
+      21 +multi-touch chords, shifted legends, physical-keyboard capture,
+         + auto-reconnect. Renders on the                                
+      22 +Fire HD 10 and types on tablet B.                              
+      23  
+      24 +The system is usable end to end. What remains is polish (PLAN.m
+         +d §5) and the optional BLE                                     
+      25 +transport (§C.7 phase 3).                                      
+      26 +                                                               
+      27  ## Dependencies
+      28  
+      29  Board: `esp32:esp32:m5stick-c`. Libraries:
+
+● Update(PLAN.md)
+  ⎿  Added 1 line, removed 1 line
+      411     → **DONE and validated on hardware.** Both tablets connect 
+           concurrently; typing works. WiFi
+      412     SoftAP + BLE HID coexistence on the M5StickC Plus is now me
+           asured, not assumed.
+      413  2. **Phase 2:** the real HTML5 keyboard — key grid, sticky mod
+           ifiers, down/up events, physical
+      414 -   keyboard capture — behind `transport.js`. → **Written**, aw
+          -aiting hardware test. Page is                                 
+      414 +   keyboard capture — behind `transport.js`. → **DONE and vali
+          +dated on hardware.** Page is                                  
+      415     inlined + gzipped into the firmware by `tools/build_page.py
+           ` (14.1 kB → 4.9 kB).
+      416  3. **Phase 3 (optional, v2):** BLE transport. Run the §B.3 gat
+           e test; if it passes, add the custom
+      417     GATT service and let the app pick its transport at runtime.
+            **The NimBLE port is already
+
+● The system does what PROMPT.md set out to build: tablet A is a working BLE
+  keyboard for tablet B. Status marked done in both docs.
+
+  Nothing is committed yet — the repo is still at Hidra init with everything
+  sitting as working-tree changes. Worth doing soon so there's a known-good
+  point to return to. Say the word and I'll commit.
+
+  Beyond that, the open items are all optional:
+
+  Polish, in rough order of how much you'd feel it. Real-use ergonomics come
+  first — key sizing and whether the latch behavior survives actual typing,
+  which only you can judge now that it's in your hands. Then reconnect behavior
+  when tablet A sleeps, which the soak test would surface. Then the smaller
+  things from §5: layout config, macros, LCD niceties.
+
+  Phase 3 (BLE transport) buys tablet A its internet back and much better
+  battery life. Cheaper than originally estimated — the build already links
+  NimBLE — but it still has that one unproven step: whether Silk can reach GATT
+  while the stick is advertising HOGP and bonded to tablet B. Worth doing only
+  if the WiFi-only tradeoff or the charging cable actually bothers you in daily
+  use.
+
+  The soak test I suggested earlier is still the highest information-per-minute
+  thing available: battery life under SoftAP, link survival across tablet sleep,
+  and whether keystrokes still land after an idle hour.
+
+  My suggestion: use it for a few days first. Real annoyances will tell you
+  which of these is worth doing better than any list I can write now.
+
+✻ Crunched for 17s

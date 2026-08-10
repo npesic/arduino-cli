@@ -1,0 +1,2799 @@
+╭─── Claude Code v2.1.221 ─────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                Welcome back Mr. No!                │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ What's new              │
+│                        ▘▘ ▝▝                       │ Bug fixes and reliabil… │
+│  Opus 5 · Claude Pro · nebojsa.pesic@gmail.com's   │ Added gateway spend-li… │
+│  Organization                                      │ Added a workspace trus… │
+│       ~/git/arduino-cli/hidra/android/hidra        │ /release-notes for more │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+ ▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+
+❯ Read the android/PROMPT.md and provide the plan.                              
+
+● I'll read the prompt file.
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+● Let me look at the existing HIDRA implementation to ground the plan.
+
+  Searched for 1 pattern, read 2 files, ran 1 shell command (ctrl+o to expand)
+
+● I've read the Android prompt and the existing PWA/firmware it's meant to
+  mirror. Writing the plan document now.
+
+● Write(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Wrote 194 lines to ../PLAN.md
+       1 # HIDRA Android — Plan & Feasibility (Phase 0)
+       3 Goal: drop the M5StickC Plus. The Pixel *is* the keyboard. Table
+         t B pairs with the phone
+       4 directly and sees an ordinary Bluetooth keyboard; the on-screen 
+       5 `src/web/`, which already looks and feels right.
+       6 
+       8   today:   [tablet A] --WiFi/WS--> [M5StickC] --BLE HID--> [tabl
+         et B]
+       9   android: [Pixel]    ------------ Bluetooth HID --------> [tabl
+      10 ```
+     … +283 lines (ctrl+o to expand)
+
+● Plan written to android/PLAN.md. The headline:
+
+  Feasibility: green, but the brief has one wrong premise. Android can be a HID
+  keyboard for another device — BluetoothHidDevice (API 28+, works on Pixels)
+  lets an app register a HID report descriptor and push reports. But that's
+  classic Bluetooth HID, not BLE/HOGP. A normal app cannot expose HOGP: AOSP's
+  GATT server treats HID service UUID 0x1812 as restricted and rejects
+  addService() without the privileged system permission. Functionally it makes
+  no difference — tablet B still sees an ordinary Bluetooth keyboard — but "over
+  BLE" is inaccurate for the Android build. High confidence on both points,
+  unverified on your hardware; that's what Phase 0 exists to settle.
+
+  The ESP32 disappears entirely. No AP, no passphrase, no QR codes, no page.h
+  build step, no flash budget. The phone talks straight to tablet B.
+
+  Most of the PWA survives. keymap.js verbatim (HID usage ids are exactly what
+  sendReport wants), style.css verbatim, app.js minus the transport. Only
+  transport.js and the wire protocol die — there's no wire anymore, D 4 0
+  becomes a direct call in-process. The firmware's 6KRO model is already the
+  boot-keyboard descriptor, 1:1.
+
+  For appearance fidelity I recommend hosting src/web/ in a WebView rather than
+  rewriting in Compose — swap transport.js for a @JavascriptInterface bridge and
+  it doesn't just resemble the PWA, it is the PWA, for about twenty lines of
+  glue. A native Compose layout is Phase 4, and because the transport sits
+  behind an interface, that's a UI swap and nothing more.
+
+  Phases: 0 = spike (one button, one letter, prove it lands on the Fire HD 10),
+  1 = transport + report builder, 2 = the keyboard UI, 3 = Android polish, 4 =
+  optional. 0–2 is the working product.
+
+  Two gotchas I'd flag now rather than at demo time: Pixel gesture navigation
+  will swallow the edge keys (needs setSystemGestureExclusionRects), and
+  reconnect-after-screen-off is the known sore spot for HID-device apps — Phase
+  0 characterises it deliberately.
+
+  Open questions are in §6; the ones that actually change the work are which
+  Pixel/Android version, and whether the phone must stay usable while connected
+  (foreground service) or full-screen-or-nothing is fine for v1. I'd start
+  full-screen.
+
+✻ Brewed for 2m 6s
+
+※ recap: Goal is an Android app that turns a Pixel into a Bluetooth keyboard for your Fire tablet, replacing the ESP32. I wrote the feasibility plan to android/PLAN.md. Next: build the Phase 0 spike proving one keystroke lands. (disable recaps in /config)
+
+❯ start phase 0                                                                 
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Environment check: x86_64, JDK 17, but no Android SDK, no Gradle, no adb. Let
+  me check what's reachable before deciding how to build.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Network is fine and there's ~5.4 GB free. I'll write the Phase 0 spike first —
+  that doesn't depend on the build environment — then sort out how to build it.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Write(~/git/arduino-cli/hidra/android/spike/app/src/main/java/com/hidra/spike/
+       HidKeyboard.kt)
+  ⎿  Wrote 252 lines to
+     ../spike/app/src/main/java/com/hidra/spike/HidKeyboard.kt
+       1 package com.hidra.spike
+       2 
+       3 import android.annotation.SuppressLint
+       4 import android.bluetooth.BluetoothAdapter
+       5 import android.bluetooth.BluetoothDevice
+       6 import android.bluetooth.BluetoothHidDevice
+       7 import android.bluetooth.BluetoothHidDeviceAppSdpSettings
+       8 import android.bluetooth.BluetoothManager
+       9 import android.bluetooth.BluetoothProfile
+      10 import android.content.Context
+     … +298 lines (ctrl+o to expand)
+
+● Write(~/git/arduino-cli/hidra/android/spike/app/src/main/java/com/hidra/spike/
+       MainActivity.kt)
+  ⎿  Wrote 238 lines to
+     ../spike/app/src/main/java/com/hidra/spike/MainActivity.kt
+       1 package com.hidra.spike
+       2 
+       3 import android.Manifest
+       4 import android.app.Activity
+       5 import android.app.AlertDialog
+       6 import android.bluetooth.BluetoothAdapter
+       7 import android.content.ClipData
+       8 import android.content.ClipboardManager
+       9 import android.content.Context
+      10 import android.content.Intent
+     … +267 lines (ctrl+o to expand)
+
+● Now the manifest and Gradle build files.
+
+● Write(~/git/arduino-cli/hidra/android/spike/app/src/main/AndroidManifest.xml)
+  ⎿  Wrote 30 lines to ../spike/app/src/main/AndroidManifest.xml
+       1 <?xml version="1.0" encoding="utf-8"?>
+         oid">
+       3 
+         the location prompt away:
+       5          we are not deriving position from Bluetooth. -->
+         CONNECT"
+       7         android:usesPermissionFlags="neverForLocation" />
+         ADVERTISE" />
+       9 
+         luetoothHidDevice's debut). -->
+     … +29 lines (ctrl+o to expand)
+
+● Write(~/git/arduino-cli/hidra/android/spike/app/build.gradle.kts)
+  ⎿  Wrote 39 lines to ../spike/app/build.gradle.kts
+       1 plugins {
+       2     id("com.android.application")
+       3     id("org.jetbrains.kotlin.android")
+       4 }
+       5 
+       6 android {
+       7     namespace = "com.hidra.spike"
+       8     compileSdk = 35
+       9 
+      10     defaultConfig {
+     … +35 lines (ctrl+o to expand)
+
+  Listed 1 directory (ctrl+o to expand)
+
+● Now I need a toolchain — nothing Android is installed. Installing the SDK +
+  Gradle (~1.5 GB into your home dir; you have 5.4 GB free).
+
+  Ran 2 shell commands (ctrl+o to expand)
+● SDK installed. Now Gradle:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Now the build:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● APK built. Verifying what's actually in it:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● The build is clean. One addition worth making before I hand this over: the
+  plan asserts BLE/HOGP is closed to normal apps — better to prove it on-device
+  than assert it.
+
+● Write(~/git/arduino-cli/hidra/android/spike/app/src/main/java/com/hidra/spike/
+       HogpProbe.kt)
+  ⎿  Wrote 65 lines to
+     ../spike/app/src/main/java/com/hidra/spike/HogpProbe.kt
+       1 package com.hidra.spike
+       2 
+       3 import android.annotation.SuppressLint
+       4 import android.bluetooth.BluetoothGattCharacteristic
+       5 import android.bluetooth.BluetoothGattServer
+       6 import android.bluetooth.BluetoothGattServerCallback
+       7 import android.bluetooth.BluetoothGattService
+       8 import android.bluetooth.BluetoothManager
+       9 import android.content.Context
+      10 import java.util.UUID
+     … +74 lines (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/spike/app/src/main/java/com/hidra/spike
+        /MainActivity.kt)
+  ⎿  Added 2 lines
+      84              })
+      85          }
+      86  
+      87 +        // Evidence for PLAN.md §1: confirm the BLE/HOGP route 
+         +really is closed to us.                                        
+      88 +        button("0. probe HOGP") { ensurePermissions { HogpProbe
+         +(this) { m -> ui.post { log(m) } }.run() } }                   
+      89          // Unknowns 1 & 2: proxy, then registerApp.
+      90          button("1. register") { ensurePermissions { hid.start()
+           } }
+      91          // Unknown 3: can tablet B find and pair with us.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● No device attached, so I can't run the on-hardware test myself. Writing the
+  test protocol and a results template for you to fill:
+
+● Write(~/git/arduino-cli/hidra/android/spike/README.md)
+  ⎿  Wrote 116 lines to ../spike/README.md
+      1 # HIDRA Phase 0 — feasibility spike
+      2 
+      3 One screen, eleven buttons, no keyboard layout. It exists to answ
+      4 [`../PLAN.md`](../PLAN.md) §2 and then be deleted.
+      5 
+      6 **The question:** can a Pixel register as a Bluetooth HID keyboar
+        d and type into the Fire HD 10?
+      8 Everything else — the layout, the latching modifiers, the WebView
+         — waits until a letter has
+      9 appeared on tablet B.
+     … +142 lines (ctrl+o to expand)
+
+● Write(~/git/arduino-cli/hidra/android/spike/RESULTS.md)
+  ⎿  Wrote 51 lines to ../spike/RESULTS.md
+      1 # Phase 0 results
+      2 
+      3 Fill this in from the run. Paste the raw log at the bottom — long
+        -press the log view to copy.
+      4 
+      6 |---|---|
+      7 | Date | |
+      8 | Phone | (model, Android version — the app logs both on startup)
+         |
+      9 | Tablet B | |
+     … +45 lines (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 8 lines, removed 5 lines
+      142  
+      143  ## 5. Phases
+      144  
+      145 -**Phase 0 — spike (the feasibility check the brief asks for).*
+          -* One activity, one button,                                   
+      146 -no layout. Tap → send `a` down, 30 ms later `a` up. Success = 
+          -the letter appears in a text                                  
+      147 -field on the Fire HD 10 after pairing from its Bluetooth setti
+          -ngs. Also measure: time from                                  
+      148 -tap to character, behaviour after screen-off/on, behaviour aft
+          -er tablet B sleeps.                                           
+      145 +**Phase 0 — spike (the feasibility check the brief asks for).*
+          +* *Built — see                                                
+      146 +[`spike/`](spike/). Awaiting a hardware run.* One activity, bu
+          +ttons, no layout. Tap → send `a`                              
+      147 +down, 30 ms later `a` up. Success = the letter appears in a te
+          +xt field on the Fire HD 10 after                              
+      148 +pairing from its Bluetooth settings. Also measure: time from t
+          +ap to character, behaviour after                              
+      149 +screen-off/on, behaviour after tablet B sleeps. The spike also
+          + probes `addService(0x1812)` so                               
+      150 +§1's HOGP claim is evidenced rather than asserted.            
+      151  *Exit criteria: a character lands, and reconnect after sleep i
+           s characterised (working, or
+      150 -working-with-a-tap, or broken).*                              
+      152 +working-with-a-tap, or broken).* Protocol in `spike/README.md`
+          +, results into                                                
+      153 +`spike/RESULTS.md`.                                           
+      154  
+      155  **Phase 1 — transport.** `KeyTransport` + `HidTransport` + `Re
+           portBuilder`, held-key set,
+      156  release-all, connection state as an observable. Pairing/connec
+           tion UI: list bonded HID hosts,
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Phase 0 is built and compiling. I couldn't run it — no device is attached to
+  this machine (adb devices is empty), so the hardware verdict is yours to
+  collect.
+
+  What exists now, in android/spike/:
+
+  - HidKeyboard.kt — the actual hypothesis. Gets the HID_DEVICE proxy, registers
+  an SDP record with a HID 1.11 boot-keyboard descriptor, and pushes 8-byte
+  reports. Usages 0xE0–0xE7 fold into the modifier byte and non-modifiers take
+  one of six slots — the same rule the ESP32 firmware uses, so keymap.js's
+  numbers already work against it. Shaped as the HidTransport Phase 1 needs, so
+  it outlives the spike even though the UI won't.
+  - HogpProbe.kt — I decided the plan shouldn't just assert that BLE/HOGP is
+  closed to normal apps. This tries addService(0x1812) on a GATT server and logs
+  the rejection. Cheap insurance: if it ever succeeds, the architecture changes
+  and you'll know immediately.
+  - MainActivity.kt — throwaway buttons and a timestamped log (long-press to
+  copy).
+
+  Toolchain: none of it was installed, so I set up ~/android-sdk (SDK 35,
+  build-tools 35.0.0, platform-tools) and ~/gradle-8.9, plus a Gradle wrapper in
+  the project. ./gradlew assembleDebug →
+  app/build/outputs/apk/debug/app-debug.apk, 2.4 MB, debug-signed. Zero
+  dependencies — framework views, platform Bluetooth,
+  Activity.requestPermissions. Nothing to go wrong except the thing being
+  tested. Verified the merged manifest carries BLUETOOTH_CONNECT with the
+  neverForLocation flag, so no location prompt.
+
+  To run it:
+
+  cd android/spike
+  adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+  Then follow the protocol in spike/README.md — T0 through T5, buttons numbered
+  in the order to press them. Paste the log into spike/RESULTS.md.
+
+  Two things I'd flag about what you'll find. T1 is the kill switch: if
+  getProfileProxy(HID_DEVICE) returns false, the Android approach dies on the
+  spot and we fall back to making the phone a client of the existing ESP32. T4 
+  is the one most likely to disappoint — reconnect after screen-off is the known
+  sore spot for HID-device apps, and the spike deliberately does not release
+  keys or unregister on pause so you can see what the stack does unaided. Phase
+  1 will release on pause; I wanted the raw behaviour on record first.
+
+  I haven't committed anything — android/ is still untracked. Say the word and
+  I'll commit it.
+
+✻ Worked for 11m 50s
+
+※ recap: Goal is turning a Pixel into a Bluetooth keyboard for tablet B, replacing the ESP32. Phase 0 spike is built and compiles into an installable APK. Next: install it on the Pixel and run the T0–T5 protocol in android/spike/README.md. (disable recaps in /config)
+
+❯ What is the bluetooth handle for tablet to pair with?                         
+
+● Tablet B will see the phone's own Bluetooth name — whatever the Pixel is
+  called in Settings → About phone → Device name (typically "Pixel 8" or
+  similar). Not "HIDRA".
+
+  The "HIDRA" strings in HidKeyboard.kt:79-85 are the SDP record's service name
+  and provider fields. Most hosts, Fire OS included, don't surface those in the
+  pairing chooser — they show the adapter name, which the app doesn't set.
+
+  To find it without touching the phone's UI:
+
+  adb shell settings get secure bluetooth_name
+
+  So in T2 you're scanning for the phone's normal name. Whether Fire OS also
+  tags it with a keyboard icon or an "input device" label depends on the
+  class-of-device bits the stack derives once the HID role is registered —
+  that's one of the things the T2 notes field is asking you to record, because I
+  don't want to guess at Fire OS's chooser behaviour.
+
+  If you'd rather it announce itself as "HIDRA" to match the ESP32 build, that's
+  BluetoothAdapter.setName() — one line, but it renames the whole phone
+  globally and persists after the app exits, so it would need saving and
+  restoring around the session. Worth doing for Phase 1 if you like the
+  branding; I'd leave the spike alone so pairing behaves as ordinarily as
+  possible.
+
+✻ Cogitated for 22s
+
+❯ Test run log: spike.log                                                       
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+● Log read. Three things in it matter, and one of them says I was wrong.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 22 lines, removed 16 lines
+      16  
+      17  ## 1. Feasibility verdict — green, with one correction to the b
+          rief
+      18  
+      19 -**Android can act as a HID keyboard for another device.** The A
+         -PI is                                                          
+      20 -`BluetoothHidDevice` (`BluetoothProfile.HID_DEVICE`, API 28+ / 
+         -Android 9), present and working                                
+      21 -on Pixels. The app registers an SDP record with a HID report de
+         -scriptor, tablet B pairs with                                  
+      22 -the phone as a keyboard, and the app pushes 8-byte boot-keyboar
+         -d reports with                                                 
+      23 -`sendReport()`.                                                
+      19 +**Android can act as a HID keyboard for another device — measur
+         +ed, not assumed.** The API is                                  
+      20 +`BluetoothHidDevice` (`BluetoothProfile.HID_DEVICE`, API 28+ / 
+         +Android 9). The app registers an                               
+      21 +SDP record with a HID report descriptor, tablet B pairs with th
+         +e phone as a keyboard, and the                                 
+      22 +app pushes 8-byte boot-keyboard reports with `sendReport()`. Ph
+         +ase 0 ran this end to end on a                                 
+      23 +Pixel 2 XL / Android 11: proxy, registration, pairing, connecti
+         +on, and correct reports on the                                 
+      24 +wire. See [`spike/RESULTS.md`](spike/RESULTS.md).              
+      25  
+      25 -**The correction:** this is *classic* Bluetooth HID (HIDP over 
+         -L2CAP), **not** BLE / HOGP.                                    
+      26 -A normal Android app cannot be a BLE HID peripheral — AOSP's GA
+         -TT server treats the HID                                       
+      27 -service UUID `0x1812` as a restricted UUID and refuses `addServ
+         -ice()` without                                                 
+      28 -`BLUETOOTH_PRIVILEGED`, which is a signature/system permission.
+         - There is no supported path                                    
+      29 -to HOGP from a user-installed app.                             
+      26 +This is *classic* Bluetooth HID (HIDP over L2CAP), not BLE / HO
+         +GP. So the name "HID keyboard                                  
+      27 +over BLE" is inaccurate for the Android build, and idle power i
+         +s slightly higher than a BLE                                   
+      28 +peripheral would draw — irrelevant on a phone battery.         
+      29  
+      31 -Practically this changes nothing for you: tablet B still sees "
+         -a Bluetooth keyboard" and                                      
+      32 -types the same. It does mean the name "HID keyboard over BLE" i
+         -s wrong for the Android build,                                 
+      33 -and it means slightly higher idle power than a BLE peripheral w
+         -ould use — irrelevant on a                                     
+      34 -phone with a 4000+ mAh battery.                                
+      30 +**Correction to an earlier claim in this document.** This secti
+         +on previously said a                                           
+      31 +non-privileged app *cannot* register the HID service UUID `0x18
+         +12` on a GATT server, and that                                 
+      32 +HOGP was therefore closed. Phase 0's probe disproves it: `addSe
+         +rvice(0x1812)` **succeeded**,                                  
+      33 +status 0, on Android 11. The restriction I was thinking of is o
+         +n the GATT *client* side —                                     
+      34 +Android stops apps reading HID characteristics of a remote devi
+         +ce, to prevent keylogging — and                                
+      35 +I wrongly generalised it to the server side.                   
+      36  
+      36 -Confidence: high on the API existing and on the `0x1812` restri
+         -ction; **not yet verified on                                   
+      37 -your hardware**, which is exactly what Phase 0 below is for. I 
+         -cannot test it from here.                                      
+      37 +What that does *not* establish is that HOGP works end to end. A
+         + functioning BLE keyboard needs                                
+      38 +the full service (report map, protocol mode, HID control point,
+         + report characteristics with                                   
+      39 +CCCDs and report-reference descriptors), advertising with the k
+         +eyboard appearance, a bond, and                                
+      40 +a host willing to accept it. `addService` succeeding proves onl
+         +y that the first door opens.                                   
+      41 +**BLE HID is therefore open-but-unproven, not closed.** Since c
+         +lassic HID already works, the                                  
+      42 +plan below still builds on classic; §5 adds an optional Phase 0
+         +b to settle HOGP if BLE                                        
+      43 +specifically matters to you.                                   
+      44  
+      45  ### What carries over unchanged
+      46  
+● Now recording the actual results:
+
+● Write(~/git/arduino-cli/hidra/android/spike/RESULTS.md)
+  ⎿  Added 97 lines, removed 28 lines
+        1  # Phase 0 results
+        2  
+        3 -Fill this in from the run. Paste the raw log at the bottom — l
+          -ong-press the log view to copy.                               
+        3 +Source log: [`../spike.log`](../spike.log), run 09:12–09:25.  
+        4  
+        5  | | |
+        6  |---|---|
+        7 -| Date | |                                                    
+        8 -| Phone | (model, Android version — the app logs both on start
+          -up) |                                                         
+        9 -| Tablet B | |                                                
+        7 +| Date | 2026-08-10 |                                         
+        8 +| Phone | Google Pixel 2 XL, Android 11 (API 30) |            
+        9 +| Host used | `Peripheral MK` / A8:E6:21:EC:A7:95 |           
+       10  
+       11  ## Outcome
+       12  
+       13 -- [ ] **T0** HOGP probe: addService(0x1812) rejected → BLE HID
+          - confirmed closed                                             
+       14 -- [ ] **T1** HID_DEVICE proxy obtained, registerApp succeeded 
+       15 -- [ ] **T2** Tablet B paired with the phone                   
+       16 -- [ ] **T3** A character appeared on tablet B ← **the exit cri
+          -terion**                                                      
+       17 -- [ ] **T4** Reconnect behaviour characterised                
+       18 -- [ ] **T5** Latency subjectively acceptable                  
+       13 +- [x] **T0** HOGP probe — **inverted result**: `addService(0x1
+          +812)` *succeeded*                                             
+       14 +- [x] **T1** HID_DEVICE proxy obtained, `registerApp()` succee
+          +ded                                                           
+       15 +- [x] **T2** Host paired and connected                        
+       16 +- [x] **T3** Reports accepted by the stack — *pending visual c
+          +onfirmation of characters*                                    
+       17 +- [ ] **T4** Reconnect behaviour — **not run**                
+       18 +- [ ] **T5** Latency — **not recorded**                       
+       19  
+       20 -**Verdict:** pass / fail / partial —                          
+       20 +**Verdict: pass on the core hypothesis.** The Bluetooth HID de
+          +vice role works on this phone: it                             
+       21 +registered, a host connected, and every report was accepted. O
+          +ne new defect found (§T1b) and one                            
+       22 +plan claim disproved (§T0).                                   
+       23  
+       22 -## Notes per test                                             
+       24 +## T0 — HOGP probe: the plan was wrong                        
+       25  
+       24 -**T0 — HOGP:**                                                
+       26 +```                                                           
+       27 +09:12:16.485  addService() returned true                      
+       28 +09:12:16.489  *** addService(0x1812) SUCCEEDED ***            
+       29 +```                                                           
+       30  
+       26 -**T1 — proxy and registration:**                              
+       31 +PLAN.md §1 claimed a non-privileged app cannot register the HI
+          +D service UUID on a GATT server.                              
+       32 +It can, at least on Android 11. That claim is now corrected in
+          + the plan.                                                    
+       33  
+       28 -**T2 — pairing.** How did tablet B describe the phone? PIN req
+          -uired?                                                        
+       34 +This does **not** mean BLE HID works — `addService` is the fir
+          +st step of many (full HOGP service,                           
+       35 +advertising with keyboard appearance, bonding, a willing host)
+          +. It means the route is                                       
+       36 +**open-but-unproven** rather than closed, which is a different
+          + thing and a better position for                              
+       37 +the original brief. Optional Phase 0b in PLAN.md §5 settles it
+          + if wanted.                                                   
+       38  
+       30 -**T3 — typing.** Which of tap / hold / shift+a / type-hidra wo
+          -rked?                                                         
+       39 +## T1 — registration: works                                   
+       40  
+       32 -**T4 — survival.** The important one:                         
+       41 +```                                                           
+       42 +09:12:19.653  got HID_DEVICE proxy                            
+       43 +09:12:19.659  registerApp() accepted                          
+       44 +09:12:19.663  onAppStatusChanged: registered=true             
+       45 +```                                                           
+       46  
+       34 -| Scenario | Reconnects? | Needs manual connect? | Notes |    
+       35 -|---|---|---|---|                                             
+       36 -| phone screen off 30 s | | | |                               
+       37 -| tablet B sleeps 60 s | | | |                                
+       38 -| app backgrounded | | | |                                    
+       39 -| out of range and back | | | |                               
+       47 +Clean, ~30 ms end to end. The kill-switch unknown is cleared. 
+       48  
+       41 -**T5 — latency:**                                             
+       49 +Note the API level: **30**, so the API 31+ runtime-permission 
+          +path never ran. If the target phone                           
+       50 +is a newer Pixel, that path is still untested — the only untes
+          +ted thing left in T1.                                         
+       51  
+       43 -## Surprises                                                  
+       52 +## T1b — the app gets silently deregistered *(new, not predict
+          +ed)*                                                          
+       53  
+       45 -Anything the plan did not predict — this is the section that c
+          -hanges Phase 1.                                               
+       54 +```                                                           
+       55 +09:12:19.663  onAppStatusChanged: registered=true             
+       56 +09:17:36.100  onAppStatusChanged: registered=false plugged=nul
+          +l    ← nobody asked for this                                  
+       57 +09:22:50.135  connect(Peripheral MK/…) -> false               
+          +     ← fails, no registration                                 
+       58 +09:23:04.387  registerApp() accepted                          
+          +     ← manual recovery                                        
+       59 +09:24:14.967  connect(Peripheral MK/…) -> true                
+          +     ← now it works                                           
+       60 +```                                                           
+       61  
+       47 -## Raw log                                                    
+       62 +Registration dropped on its own after ~5m16s, and every later 
+          +`connect()` failed silently until                             
+       63 +the app was re-registered by hand. Without the log this looks 
+          +like "the connect button is                                   
+       64 +broken".                                                      
+       65  
+       66 +Two candidate causes, neither confirmed:                      
+       67 +                                                              
+       68 +1. **Discoverability window.** The first 300 s window opened a
+          +t 09:12:34 and would expire at                                
+       69 +   09:17:34 — two seconds before the deregistration. Tight cor
+          +relation. But a second window was                             
+       70 +   requested at 09:16:47, which should have extended it, so ei
+          +ther that request was declined or                             
+       71 +   the two are unrelated.                                     
+       72 +2. **Backgrounding.** The phone was in Bluetooth settings for 
+          +much of that stretch. But it stayed                           
+       73 +   registered for five minutes of that, so a simple foreground
+          + rule does not fit either.                                    
+       74 +                                                              
+       75 +**Phase 1 requirement regardless of cause:** treat `onAppStatu
+          +sChanged(registered=false)` as a                              
+       76 +recoverable event and re-register automatically, rather than a
+          +ssuming registration is permanent.                            
+       77 +This is exactly the kind of thing the spike existed to find.  
+       78 +                                                              
+       79 +## T2 — pairing: works                                        
+       80 +                                                              
+       81 +Host connected on the second attempt, once registration was re
+          +stored:                                                       
+       82 +                                                              
+       83  ```
+       50 -(paste)                                                       
+       84 +09:24:14.974  -> connecting                                   
+       85 +09:24:15.550  -> CONNECTED        (576 ms)                    
+       86  ```
+       87 +                                                              
+       88 +Not recorded: how the host described the phone in its chooser,
+          + and whether a PIN was needed.                                
+       89 +                                                              
+       90 +## T3 — reports: all correct on the wire                      
+       91 +                                                              
+       92 +Every report matches what the descriptor promises. Spot-checki
+          +ng the bytes:                                                 
+       93 +                                                              
+       94 +| Action | Report | Correct? |                                
+       95 +|---|---|---|                                                 
+       96 +| `a` down | `00 00 04 00 00 00 00 00` | yes — usage 0x04 in s
+          +lot 1 |                                                       
+       97 +| shift down | `02 00 00 00 00 00 00 00` | yes — 0x02 is bit 1
+          +, Left Shift |                                                
+       98 +| shift+`a` | `02 00 04 00 00 00 00 00` | yes — modifier and k
+          +ey in one report |                                            
+       99 +| `hidra` | `0B, 0C, 07, 15, 04` | yes — h i d r a |          
+      100 +| release all | `00 00 00 00 00 00 00 00` | yes |             
+      101 +                                                              
+      102 +The modifier-folding rule (`0xE0`–`0xE7` → bitmask, everything
+          + else → key slot) behaves exactly                             
+      103 +as the ESP32 firmware does, so `keymap.js` will drop straight 
+          +in.                                                           
+      104 +                                                              
+      105 +`sendReport()` local call time: **691 µs – 2.6 ms**, one outli
+          +er at **7.5 ms** on the key-up after                          
+      106 +the 3-second hold. That is the local call only, not air time. 
+      107 +                                                              
+      108 +**Open:** the log cannot show whether characters actually appe
+          +ared on the host. Needs confirming                            
+      109 +by eye.                                                       
+      110 +                                                              
+      111 +## T4 / T5 — not run                                          
+      112 +                                                              
+      113 +No screen-off, host-sleep, backgrounding, or out-of-range cycl
+          +es in the log, and no latency                                 
+      114 +impression. T4 is the sore spot the plan flagged and the last 
+          +real risk before Phase 1.                                     
+      115 +                                                              
+      116 +## What changes in the plan                                   
+      117 +                                                              
+      118 +1. §1's HOGP claim corrected; BLE reclassified open-but-unprov
+          +en.                                                           
+      119 +2. New Phase 1 requirement: auto-re-register on `registered=fa
+          +lse` (T1b).                                                   
+      120 +3. Still to do: T4, and T1 on an API 31+ phone if the target i
+          +s a newer Pixel.                                              
+
+● Now folding the two findings into the phase list:
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 2 lines, removed 1 line
+      133    │      ▼                                                    
+                            │
+      134    │   KeyTransport  (interface)                               
+                            │
+      135    │      ├── HidTransport      → BluetoothHidDevice.sendReport
+           ()   [primary]   │
+      136 -  │      └── WsTransport       → the ESP32, if Phase 0 fails  
+          -     [fallback]  │                                            
+      136 +  │      │     └── keeps itself registered; re-registers on re
+          +gistered=false   │                                            
+      137 +  │      └── WsTransport       → the ESP32, if ever needed    
+          +     [fallback]  │                                            
+      138    │      ▼                                                    
+                            │
+      139    │   ReportBuilder — modifier bitmask + 6 keycode slots, boot
+            protocol        │
+      140    └───────────────────────────────────────────────────────────
+           ─────────────────┘
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 12 lines
+      159  working-with-a-tap, or broken).* Protocol in `spike/README.md`
+           , results into
+      160  `spike/RESULTS.md`.
+      161  
+      162 +**Phase 0b — HOGP, optional.** Only if BLE specifically matter
+          +s (the brief asks for it, the                                 
+      163 +product does not need it). Build the full HID-over-GATT servic
+          +e on top of the `addService` that                             
+      164 +Phase 0 showed is permitted — report map, protocol mode, contr
+          +ol point, report characteristics                              
+      165 +with CCCDs and report-reference descriptors — advertise with t
+          +he keyboard appearance, and see                               
+      166 +whether tablet B bonds and types. Timeboxed: if a host will no
+          +t accept it in a day, classic HID                             
+      167 +already works and this stays shelved.                         
+      168 +                                                              
+      169  **Phase 1 — transport.** `KeyTransport` + `HidTransport` + `Re
+           portBuilder`, held-key set,
+      170  release-all, connection state as an observable. Pairing/connec
+           tion UI: list bonded HID hosts,
+      171  connect, show status. Unit tests on `ReportBuilder`.
+      172  
+      173 +*Carried from Phase 0:* registration is not permanent — the sp
+          +ike lost it after ~5 minutes and                              
+      174 +then failed every `connect()` silently (RESULTS.md §T1b). `Hid
+          +Transport` must treat                                         
+      175 +`onAppStatusChanged(registered=false)` as recoverable and re-r
+          +egister, and the UI must never                                
+      176 +offer a connect button that quietly does nothing.             
+      177 +                                                              
+      178  **Phase 2 — the keyboard.** `src/web/` into assets, `transport
+           .js` swapped for the bridge,
+      179  WebView wired to `KeyTransport`. At this point it is the PWA, 
+           minus the ESP32. Status pills
+      180  in the existing top bar are repointed at the Bluetooth connect
+           ion state; the battery pill
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 4 lines, removed 2 lines
+      149  
+      150  ## 5. Phases
+      151  
+      152 -**Phase 0 — spike (the feasibility check the brief asks for).*
+          -* *Built — see                                                
+      153 -[`spike/`](spike/). Awaiting a hardware run.* One activity, bu
+          -ttons, no layout. Tap → send `a`                              
+      152 +**Phase 0 — spike (the feasibility check the brief asks for).*
+          +* *Done — passed on a Pixel 2 XL /                            
+      153 +Android 11; see [`spike/RESULTS.md`](spike/RESULTS.md). Outsta
+          +nding: T4 (reconnect after                                    
+      154 +screen-off / host sleep) and, if the target is a newer Pixel, 
+          +the API 31+ permission path.*                                 
+      155 +One activity, buttons, no layout. Tap → send `a`              
+      156  down, 30 ms later `a` up. Success = the letter appears in a te
+           xt field on the Fire HD 10 after
+      157  pairing from its Bluetooth settings. Also measure: time from t
+           ap to character, behaviour after
+      158  screen-off/on, behaviour after tablet B sleeps. The spike also
+            probes `addService(0x1812)` so
+
+● Phase 0 passes. The core hypothesis held: proxy → registration → pairing →
+  connection → correct reports, all on hardware. spike/RESULTS.md now has the
+  full analysis, and I've folded the findings back into PLAN.md.
+
+  Three things from the log worth your attention.
+
+  1. I was wrong about BLE. The plan claimed a non-privileged app can't register
+  HID service UUID 0x1812 on a GATT server. Your probe returned SUCCEEDED,
+  status 0. The restriction I was thinking of is on the GATT client side —
+  Android blocks apps from reading a remote device's HID characteristics, to
+  stop keyloggers — and I generalised it to the server side, which was sloppy.
+  Corrected in §1.
+
+  What it doesn't prove is that HOGP works end to end; addService is the first
+  of several doors (full service with report map and CCCDs, keyboard-appearance
+  advertising, bonding, a willing host). So BLE is open-but-unproven rather than
+  closed — which is better news for your original brief than what I told you. I
+  added an optional, timeboxed Phase 0b to settle it, since classic HID already
+  works and doesn't need it.
+
+  2. Registration silently died after ~5 minutes — this one is a real find. At
+  09:17:36 you got registered=false that nobody asked for, and every connect()
+  after that returned false until you re-registered by hand at 09:23. Without
+  the log this presents as "the connect button is broken." I can't pin the
+  cause: the timing sits 2 seconds after the first discoverability window
+  expired, which is suggestive, but you requested a second window at 09:16:47
+  that should have extended it. Either way Phase 1 must treat registered=false
+  as recoverable and re-register automatically. That's now a stated requirement.
+
+  3. The reports are all byte-correct. Shift is 02 (bit 1, Left Shift), shift+a
+  puts modifier and key in one report, hidra is 0B 0C 07 15 04. The
+  modifier-folding rule matches the ESP32 firmware exactly, so keymap.js drops
+  in unchanged. sendReport took 0.7–2.6 ms locally, one 7.5 ms outlier on the
+  key-up after the long hold.
+
+  Two gaps before Phase 1, and one question:
+
+  - T4 never ran — no screen-off, host-sleep, backgrounding, or range cycles.
+  That was the risk I flagged as most likely to disappoint, and it's now the
+  last unknown.
+  - Did characters actually appear? The log proves the stack accepted every
+  report; it can't prove anything rendered on the host. Worth a one-word
+  confirmation.
+  - The phone was a Pixel 2 XL on Android 11 (API 30), so the API 31+
+  runtime-permission path never executed. If the real target is a current Pixel,
+  that's untested — small, but it's the thing that gates the app even starting.
+
+  Also, Peripheral MK isn't the Fire HD 10 — if the Fire is still the intended
+  tablet B, it's worth one pairing run against it, since Fire OS's Bluetooth
+  chooser is Amazon's own.
+
+✻ Cogitated for 2m 26s
+
+❯ yes, characters appeared on the host. It would be great to allow any Pixel    
+  phone to be keyboard host, starting with Pixel 2 XL. Keyvoard client can be   
+  any tablet or device, for example it could be the Chromebook tablet.          
+
+● Good — T3 confirmed, so the exit criterion is met. Your scope note changes two
+  real things, so let me record it and flag the one consequence I don't think
+  has surfaced yet.
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 39 lines, removed 6 lines
+      194  
+      195  ---
+      196  
+      197 -## 6. What I need from you                                    
+      197 +## 6. Target matrix (decided 2026-08-10)                      
+      198  
+      199 -1. **Which Pixel, and which Android version?** Decides the per
+          -mission model (12+ vs older)                                  
+      200 -   and whether gesture-nav exclusion matters.                 
+      201 -2. **Is tablet B still the Fire HD 10?** If so it is Android 9
+          - / Fire OS, and pairing must be                               
+      202 -   driven from its settings UI.                               
+      203 -3. **Should the phone stay usable while HIDRA is connected** (
+          -foreground service, keyboard in                               
+      199 +**Sending side: any Pixel phone, Pixel 2 XL first.** So the ap
+          +p spans **API 28 (Android 9)                                  
+      200 +through API 35+**, and both permission models are live: instal
+          +l-time on the Pixel 2 XL (API 30,                             
+      201 +its ceiling) and runtime `BLUETOOTH_CONNECT` on anything Andro
+          +id 12 or newer. Phase 0 only                                  
+      202 +exercised the install-time path — the runtime path is written 
+          +but unproven, and it gates the                                
+      203 +app starting at all, so it is the first thing to test on a mod
+          +ern Pixel.                                                    
+      204 +                                                              
+      205 +Gesture navigation also only matters on the newer phones; the 
+          +Pixel 2 XL predates it.                                       
+      206 +                                                              
+      207 +**Receiving side: anything that accepts a Bluetooth keyboard**
+          + — the Fire HD 10, a Chromebook                               
+      208 +tablet, a laptop, another phone. This is the strongest argumen
+          +t yet for the choices already                                 
+      209 +made:                                                         
+      210 +                                                              
+      211 +- **Classic HID over HOGP.** Every desktop and mobile OS has a
+          +ccepted classic Bluetooth                                     
+      212 +  keyboards for twenty years; BLE/HOGP support is more variabl
+          +e and more recent. Phase 0b drops                             
+      213 +  to the bottom of the list — it would *narrow* compatibility,
+          + not widen it.                                                
+      214 +- **Boot-protocol descriptor.** The most universally understoo
+          +d keyboard there is. Keep it, and                             
+      215 +  keep honouring `onGetReport` and `onSetProtocol`, because un
+          +familiar hosts do probe.                                      
+      216 +- **No assumptions about the pairing UI.** Fire OS, ChromeOS a
+          +nd Windows all drive pairing                                  
+      217 +  differently. The app's job is to be registered and discovera
+          +ble; the host's job is the rest.                              
+      218 +                                                              
+      219 +Per-device testing is then a matrix, not a checklist. Suggeste
+          +d minimum before calling it done:                             
+      220 +{Pixel 2 XL, one current Pixel} × {Fire HD 10, Chromebook tabl
+          +et}.                                                          
+      221 +                                                              
+      222 +### Consequence for the keyboard layout — worth deciding early
+      223 +                                                              
+      224 +The PWA layout in `src/web/` was drawn for a 10-inch tablet. T
+          +he Pixel 2 XL is a 5.7-inch                                   
+      225 +screen; in landscape, a full 15-column QWERTY plus a function 
+          +row gives roughly **7 mm keys** —                             
+      226 +below the ~9 mm that touch targets want, and the function row 
+          +makes it worse. The layout cannot                             
+      227 +simply be ported at full width to the smallest supported phone
+          +.                                                             
+      228 +                                                              
+      229 +Options, cheapest first: drop the function row to a toggle rat
+          +her than an always-on row (it is                              
+      230 +already reference material more than a typing target, per `sty
+          +le.css`); scale key height by                                 
+      231 +screen size; or ship a compact layout for phones under ~6 inch
+          +es and the full one above. I would                            
+      232 +do the first two in Phase 2 and only build a second layout if 
+          +it still feels cramped.                                       
+      233 +                                                              
+      234 +## 7. Still open                                              
+      235 +                                                              
+      236 +1. **Should the phone stay usable while HIDRA is connected** (
+          +foreground service, keyboard in                               
+      237     a floating window or notification) — or is full-screen-or-n
+           othing fine for v1? Full-screen
+      238     is much simpler and I'd start there.
+      239  4. **Does this repo hold the Android app, or a new one?** An A
+           ndroid Gradle project under
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 10 lines, removed 4 lines
+      244  
+      245  ---
+      246  
+      247 -## 7. Recommendation                                          
+      247 +## 8. Where this stands                                       
+      248  
+      249 -Start Phase 0 today — it is a few hundred lines and it either 
+          -de-risks the whole project or                                 
+      250 -kills it in an afternoon. Do not write a line of keyboard UI u
+          -ntil a letter has appeared on                                 
+      251 -tablet B.                                                     
+      249 +Phase 0 is **done and passed** — characters confirmed on the r
+          +eceiving device, reports                                      
+      250 +byte-correct, one defect found (registration expiry, RESULTS.m
+          +d §T1b) and one plan claim                                    
+      251 +corrected (HOGP is not blocked). Phase 1 can start.           
+      252 +                                                              
+      253 +Two things are still owed from hardware, neither of which bloc
+          +ks Phase 1:                                                   
+      254 +                                                              
+      255 +- **T4** — reconnect after screen-off / host sleep / backgroun
+          +ding. The last real risk. Its                                 
+      256 +  result tunes the auto-reconnect work rather than deciding wh
+          +ether to do it.                                               
+      257 +- **API 31+ startup** — permissions and registration on a curr
+          +ent Pixel.                                                    
+
+● Update(~/git/arduino-cli/hidra/android/spike/RESULTS.md)
+  ⎿  Added 1 line, removed 1 line
+      13  - [x] **T0** HOGP probe — **inverted result**: `addService(0x18
+          12)` *succeeded*
+      14  - [x] **T1** HID_DEVICE proxy obtained, `registerApp()` succeed
+          ed
+      15  - [x] **T2** Host paired and connected
+      16 -- [x] **T3** Reports accepted by the stack — *pending visual co
+         -nfirmation of characters*                                      
+      16 +- [x] **T3** Characters appeared on the receiving device — **ex
+         +it criterion met**                                             
+      17  - [ ] **T4** Reconnect behaviour — **not run**
+      18  - [ ] **T5** Latency — **not recorded**
+      19  
+
+● Update(~/git/arduino-cli/hidra/android/spike/RESULTS.md)
+  ⎿  Added 2 lines, removed 2 lines
+      105  `sendReport()` local call time: **691 µs – 2.6 ms**, one outli
+           er at **7.5 ms** on the key-up after
+      106  the 3-second hold. That is the local call only, not air time.
+      107  
+      108 -**Open:** the log cannot show whether characters actually appe
+          -ared on the host. Needs confirming                            
+      109 -by eye.                                                       
+      108 +**Confirmed by eye:** characters appeared on the receiving dev
+          +ice. Phase 0's exit criterion is                              
+      109 +met.                                                          
+      110  
+      111  ## T4 / T5 — not run
+      112  
+
+● Recorded. Phase 0 is formally closed as passed, and PLAN.md §6 is now a target
+  matrix instead of open questions.
+
+  What your scope note changes:
+
+  API span widens to 28–35+. The Pixel 2 XL tops out at Android 11 (API 30),
+  current Pixels are 34/35+. So both permission models are live simultaneously —
+  install-time on the old phone, runtime BLUETOOTH_CONNECT on anything Android
+  12 or newer. The runtime path is written but has never executed, and it gates
+  the app starting at all, so it's the first thing to check on a modern Pixel.
+  Gesture-nav exclusion likewise only matters on the newer phones; the 2 XL
+  predates it.
+
+  "Any receiving device" settles the BLE question by itself. Classic Bluetooth
+  keyboards have been accepted by every desktop and mobile OS for two decades;
+  HOGP support is patchier and more recent. A Chromebook tablet, a Fire HD, a
+  laptop — all take classic without argument. Chasing HOGP would narrow
+  compatibility, so Phase 0b drops to the bottom of the list. That also makes
+  the boot-protocol descriptor the right call, since it's the most universally
+  understood keyboard there is.
+
+  One consequence I want to raise before Phase 2, not during it. The PWA layout
+  was drawn for a 10-inch tablet. The Pixel 2 XL is 5.7 inches — in landscape, a
+  15-column QWERTY plus the function row works out to roughly 7 mm keys, under
+  the ~9 mm touch targets want. The layout can't port at full width to the
+  smallest phone you've named. Cheapest fixes are making the function row a
+  toggle rather than an always-on row (your own CSS comment already calls it
+  "reference material more than a typing target") and scaling key height by
+  screen size. I'd do those two in Phase 2 and only build a separate compact
+  layout if it still feels cramped.
+
+  Small terminology note for the docs: in HID terms the receiving device is the
+  "host" and the phone is the "device"/peripheral — the reverse of how you
+  phrased it. I've written the plan as "phone" and "receiving device" throughout
+  to keep it unambiguous.
+
+  Two items still owed from hardware, neither blocking: T4 (reconnect after
+  screen-off/sleep — the last real risk) and API 31+ startup on a current Pixel.
+
+  One question still open from the original plan: should the phone stay usable 
+  while connected — foreground service, floating window — or is full-screen-only
+  fine for v1? I'd start full-screen; it's much simpler and you can always add
+  the service later.
+
+  Want me to start Phase 1 (transport + report builder + auto-re-registration),
+  or would you rather run T4 first so its result can shape the reconnect design?
+
+✻ Cogitated for 1m 29s
+
+❯ start phase 1, full-screen only is fine                                       
+
+● Phase 1. This becomes the real app at android/hidra/ — the spike stays as the
+  Phase 0 record.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Write(app/src/main/java/com/hidra/ReportBuilder.kt)
+  ⎿  Wrote 96 lines to app/src/main/java/com/hidra/ReportBuilder.kt
+       1 package com.hidra
+       3 /**
+       4  * The 8-byte HID boot keyboard report: `[modifiers, reserved, k
+       5  *
+       6  * Deliberately free of Android imports so it runs on the JVM un
+       7  * piece of HIDRA with logic subtle enough to get quietly wrong,
+          and a wrong report is invisible
+         .
+       9  *
+         keymap.js` usage ids work here
+     … +105 lines (ctrl+o to expand)
+
+● Write(app/src/test/java/com/hidra/ReportBuilderTest.kt)
+  ⎿  Wrote 153 lines to app/src/test/java/com/hidra/ReportBuilderTest.kt
+      1 package com.hidra
+      2 
+      3 import org.junit.Assert.assertArrayEquals
+      4 import org.junit.Assert.assertEquals
+      5 import org.junit.Assert.assertFalse
+      6 import org.junit.Assert.assertTrue
+      7 import org.junit.Test
+      8 
+      9 class ReportBuilderTest {
+     … +154 lines (ctrl+o to expand)
+
+● Now the transport interface and the HID implementation with
+  auto-re-registration:
+
+● Write(app/src/main/java/com/hidra/KeyTransport.kt)  ⎿  Wrote 71 lines to app/src/main/java/com/hidra/KeyTransport.kt
+       1 package com.hidra
+       3 /**
+       4  * What the keyboard UI is allowed to know about how keys leave 
+         the phone.
+       6  * The UI calls down/up/releaseAll and reads `status`; it never 
+         learns whether that becomes a
+         g at all. Phase 2 hangs the
+       8  * WebView off this and Phase 4 can swap the UI without touching
+          anything below it.
+      10 interface KeyTransport {
+     … +72 lines (ctrl+o to expand)
+
+● Write(app/src/main/java/com/hidra/HidTransport.kt)
+  ⎿  Wrote 304 lines to app/src/main/java/com/hidra/HidTransport.kt
+       1 package com.hidra
+       2 
+       3 import android.annotation.SuppressLint
+       4 import android.bluetooth.BluetoothAdapter
+       5 import android.bluetooth.BluetoothDevice
+       6 import android.bluetooth.BluetoothHidDevice
+       7 import android.bluetooth.BluetoothHidDeviceAppSdpSettings
+       8 import android.bluetooth.BluetoothManager
+       9 import android.bluetooth.BluetoothProfile
+      10 import android.content.Context
+     … +352 lines (ctrl+o to expand)
+
+● Write(app/src/main/java/com/hidra/MainActivity.kt)
+  ⎿  Wrote 245 lines to app/src/main/java/com/hidra/MainActivity.kt
+       1 package com.hidra
+       2 
+       3 import android.Manifest
+       4 import android.app.Activity
+       5 import android.app.AlertDialog
+       6 import android.bluetooth.BluetoothAdapter
+       7 import android.content.Intent
+       8 import android.content.pm.PackageManager
+       9 import android.graphics.Color
+      10 import android.graphics.Typeface
+     … +283 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Build and tests pass. Verifying the tests actually ran rather than being
+  skipped:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Quick mutation check to confirm the tests aren't vacuous:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Write(README.md)
+  ⎿  Wrote 65 lines to README.md
+      1 # HIDRA for Android
+      2 
+         laptop — anything that
+      4 accepts a Bluetooth keyboard — and type on the phone to type on t
+        hat device. No ESP32.
+      6 Feasibility, architecture and phasing live in [`../PLAN.md`](../P
+        LAN.md). The Phase 0 spike that
+      7 proved it works on hardware is in [`../spike/`](../spike/); this 
+      8 
+      9 ## Status — Phase 1
+     … +80 lines (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 4 lines, removed 3 lines
+      168  whether tablet B bonds and types. Timeboxed: if a host will no
+           t accept it in a day, classic HID
+      169  already works and this stays shelved.
+      170  
+      171 -**Phase 1 — transport.** `KeyTransport` + `HidTransport` + `Re
+          -portBuilder`, held-key set,                                   
+      172 -release-all, connection state as an observable. Pairing/connec
+          -tion UI: list bonded HID hosts,                               
+      173 -connect, show status. Unit tests on `ReportBuilder`.          
+      171 +**Phase 1 — transport.** *Done — see [`hidra/`](hidra/). Build
+          +s; 18 unit tests green; not yet                               
+      172 +run on hardware.* `KeyTransport` + `HidTransport` + `ReportBui
+          +lder`, held-key set, release-all,                             
+      173 +connection state as an observable. Pairing/connection UI: list
+          + bonded HID hosts, connect, show                              
+      174 +status. Unit tests on `ReportBuilder`.                        
+      175  
+      176  *Carried from Phase 0:* registration is not permanent — the sp
+           ike lost it after ~5 minutes and
+      177  then failed every `connect()` silently (RESULTS.md §T1b). `Hid
+           Transport` must treat
+
+● Phase 1 is built at android/hidra/ — the real app, with the spike left intact
+  as the Phase 0 record.
+
+  Four files, one interface between them:
+
+  - ReportBuilder.kt — the 8-byte boot report. Deliberately plain Kotlin with no
+  Android imports so it runs under JVM unit test, because this is the one piece
+  whose bugs are invisible until someone notices a stuck key on a device across
+  the room.
+  - KeyTransport.kt — all the UI is allowed to know: keyDown/keyUp/releaseAll
+  and a LinkStatus. Phase 2's WebView hangs off this without touching anything
+  below.
+  - HidTransport.kt — registration, recovery, connection, sendReport.
+  - MainActivity.kt — scaffolding: pair, connect, six real keys. Phase 2
+  replaces it.
+
+  The two Phase 0 findings are designed in, not patched over. Registration is
+  now treated as temporary by default — registered=false is routine, triggering
+  re-registration with backoff from 1 s to 30 s, and failure is only reported
+  once recovery genuinely gives up. And canType/canConnect drive button
+  enablement straight from the transport's state, so the silent-failure mode
+  that ate half an hour of your Phase 0 session can't recur. Keys also release
+  on onPause.
+
+  Verification: ./gradlew test assembleDebug is green — 18 tests, 0 skipped, 0
+  failures, covering modifier folding, slot reuse, the 6-key limit and 7th-key
+  drop, and that report() doesn't alias internal state. I also mutation-checked
+  them: breaking the slot allocator made 3 tests fail, so they're doing real
+  work. APK is 2.3 MB.
+
+  I have not run it on hardware — no device is attached here. That's the next
+  step:
+
+  cd android/hidra && adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+  Two things worth watching when you do. The API 31+ permission path finally
+  gets exercised if you install on a newer Pixel — it's implemented but has
+  never executed. And T4 comes almost free now: leave it registered for ten
+  minutes and the log should show the registration expiring and recovering on 
+  its own, which is the direct test of whether the auto-re-registration actually
+  fixes the Phase 0 defect.
+
+  Rollover deserves one note since I made a judgement call: a seventh
+  simultaneous non-modifier key is dropped rather than sending the spec's
+  ErrorRollOver report. That matches the ESP32 firmware, and on a touch keyboard
+  six simultaneous keys means a palm on the glass — dropping the extra is
+  kinder than telling the host every key is invalid. Reversible in one place if
+  you disagree.
+
+  Nothing is committed yet; android/ is still untracked.
+
+✻ Cogitated for 5m 27s
+
+※ recap: Goal: turn a Pixel into a Bluetooth keyboard for any tablet, replacing the ESP32. Phase 0 passed on hardware and Phase 1 (transport, 18 tests green) is built but untested. Next: install android/hidra's APK on the phone and try it. (disable recaps in /config)
+
+❯ Installed in Pixel 2 XL and it worked. One thing is strange: although it      
+  worked if the tablet is fire tablet, the chromebook tablet didn't see the     
+  Pixel in the bluetooth pairing list.                                          
+
+● That's a compatibility difference worth pinning down properly, because it
+  bears directly on the "any receiving device" scope.
+
+  Leading hypothesis: Class of Device filtering. The Pixel advertises itself
+  with major device class Phone — that's the adapter's CoD, and registering a
+  HID device app doesn't change it. Android exposes no API to set it (it comes
+  from a system property), so HIDRA can't present the phone as a keyboard-class
+  peripheral. Fire OS lists everything discoverable regardless of class, which
+  is why it works there. ChromeOS filters its "Available devices" list by device
+  type, so a phone-class device offering a keyboard doesn't make the cut.
+
+  The workaround needs no code: bond from the phone's side instead. Nothing
+  requires the Chromebook to see the Pixel — only that the two are bonded, and
+  either side can initiate that:
+
+  1. Chromebook: Settings → Bluetooth → Pair new device (it's discoverable while
+  that dialog is open).
+  2. Pixel: Settings → Connected devices → Pair new device → pick the Chromebook
+  → bond.
+  3. HIDRA → connect → the Chromebook is now in the list.
+
+  HIDRA lists bonded devices and initiates the HID connection itself, so this
+  should just work as the app stands.
+
+  That's also a clean diagnostic, which is why I'd try it before writing
+  anything. If it works, the problem is purely ChromeOS's discovery filter and
+  the fix is an in-app "pair a device" flow that scans and calls createBond()
+  from the phone — contained work, and given your scope I think it's worth
+  building. If it fails, ChromeOS is refusing HID connections from a phone-class
+  device altogether, which is a substantially bigger problem and would be the
+  thing that revives the HOGP question from Phase 0.
+
+  I've noted it in the plan:
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 24 lines
+      220  Per-device testing is then a matrix, not a checklist. Suggeste
+           d minimum before calling it done:
+      221  {Pixel 2 XL, one current Pixel} × {Fire HD 10, Chromebook tabl
+           et}.
+      222  
+      223 +### Known: the Chromebook does not list the phone (2026-08-10)
+      224 +                                                              
+      225 +Phase 1 on a Pixel 2 XL types to the Fire HD 10, but the Chrom
+          +ebook tablet never shows the                                  
+      226 +phone in its Bluetooth pairing list.                          
+      227 +                                                              
+      228 +Leading hypothesis is **Class of Device**. The adapter adverti
+          +ses major class *Phone*;                                      
+      229 +registering a HID device app does not change that, and Android
+          + gives apps no way to set it (it                              
+      230 +comes from a system property). Fire OS lists everything discov
+          +erable and so is unaffected;                                  
+      231 +ChromeOS filters its available-devices list by device type, so
+          + a phone offering a keyboard is                               
+      232 +filtered out.                                                 
+      233 +                                                              
+      234 +Nothing requires the receiving device to *see* the phone — onl
+          +y that the two are bonded, and                                
+      235 +either side can start that. **Bond from the phone** (Settings 
+          +→ Connected devices → Pair new                                
+      236 +device, with the Chromebook's pairing dialog open), then use H
+          +IDRA's connect list as normal.                                
+      237 +                                                              
+      238 +That workaround is also the diagnostic:                       
+      239 +                                                              
+      240 +- **Works** → the problem is only ChromeOS's discovery filter.
+          + Fix is an in-app pairing flow                                
+      241 +  that scans and calls `createBond()` from the phone, rather t
+          +han relying on the receiving                                  
+      242 +  device to list us. Worth building, given "any receiving devi
+          +ce".                                                          
+      243 +- **Fails** → ChromeOS is refusing HID connections from a phon
+          +e-class device outright. Much                                 
+      244 +  more serious, and the one scenario that would make Phase 0b 
+          +(HOGP) worth revisiting, since a                              
+      245 +  BLE peripheral advertises its own appearance independent of 
+          +the adapter's CoD.                                            
+      246 +                                                              
+      247  ### Consequence for the keyboard layout — worth deciding early
+      248  
+      249  The PWA layout in `src/web/` was drawn for a 10-inch tablet. T
+           he Pixel 2 XL is a 5.7-inch
+
+● Try the phone-side bond and tell me which way it goes — that determines
+  whether the next piece of work is a small in-app pairing flow or a much bigger
+  question about ChromeOS.
+
+  Worth saying plainly: the CoD explanation is a hypothesis that fits the
+  evidence (Android host works, ChromeOS doesn't), not something I've confirmed
+  on your hardware. The bond-from-the-phone test is what settles it either way.
+
+✻ Cogitated for 1m 8s
+
+※ recap: We're building HIDRA for Android, a Pixel that acts as a Bluetooth keyboard for other devices; Phase 1 works on the Pixel 2 XL and types to the Fire tablet, but the Chromebook won't list the phone. Next: bond from the phone's Bluetooth settings instead, then connect in HIDRA.
+
+❯ Is there any different way that is not including phone bonding  to make this  
+  keyboard implementation look like any other generic bluetooth keyboard?       
+
+● Short answer: not over classic Bluetooth from an ordinary app. The Class of
+  Device is owned by the system, not by your process.
+
+  Why it's closed. There is an API — BluetoothAdapter.setBluetoothClass() — but
+  it's @SystemApi gated on BLUETOOTH_PRIVILEGED, which is signature|privileged.
+  Reflection doesn't help: the permission is enforced in the Bluetooth process,
+  not in your app's copy of the framework, so a hidden-API call just fails on
+  the far side. The underlying value comes from a system property read at stack
+  startup. Nothing a sideloaded or Play Store app can touch.
+
+  Before building anything, confirm the diagnosis. On the Chromebook, open
+  chrome://bluetooth-internals/#/devices and scan with HIDRA discoverable. That
+  page is unfiltered and shows the class of each device. Two outcomes:
+
+  - The Pixel appears there (with a phone class) → confirmed: ChromeOS sees it
+  and the settings UI is filtering it out. Everything below applies.
+  - It doesn't appear at all → the cause isn't CoD, it's discoverability or the
+  inquiry itself, and the fix is somewhere completely different. Worth ten
+  minutes to avoid building the wrong thing.
+
+  If CoD is confirmed, the one genuine in-app alternative is BLE — Phase 0b. A
+  BLE peripheral advertises the HID service UUID 0x1812 in its advertisement
+  data, and that's typically what makes BlueZ (and therefore ChromeOS) classify
+  a device as an input device. Crucially, that advertisement is under your app's
+  control via AdvertiseData.addServiceUuid(), and it's independent of the
+  classic CoD. Your Phase 0 probe already showed addService(0x1812) succeeds, so
+  the first door opens.
+
+  Two caveats I want to be straight about. The GAP Appearance characteristic —
+  the field that literally says "keyboard" — is owned by the Android stack and I
+  don't believe an app can set it; the service-UUID route is the workable
+  lever, and whether ChromeOS is satisfied by that alone is exactly what a spike
+  would find out. And HOGP support across receiving devices is patchier than
+  classic, so this could fix the Chromebook while costing you an older host.
+
+  If these are your own devices, root or a system-signed build makes the CoD
+  property settable directly, which is the clean fix — but it doesn't generalise
+  past devices you control.
+
+  My recommendation: run the bluetooth-internals check, and if it confirms CoD,
+  treat Phase 0b as a timeboxed spike — advertise 0x1812 and see whether the
+  Chromebook lists it. That's a day's work with a clear yes/no, and it's the
+  only path to "looks like a generic keyboard" that doesn't need root or
+  phone-side bonding.
+
+✻ Worked for 51s
+
+❯ Tried bluetooth-internals: phone is showing in the device list when scan is   
+  started                                                                       
+
+● That's a useful result: the Chromebook sees the Pixel and its Settings UI is
+  choosing not to show it. So this is a filtering problem, not a discovery or
+  discoverability problem, and no amount of work on the advertising/inquiry side
+  will help.
+
+  Two candidate causes survive, and they lead to very different work:
+
+  1. Class of Device filtering — what I proposed. The
+  chrome://bluetooth-internals device row has a Class column: what does it say
+  for the Pixel? A value like 0x5a020c is major class Phone. That's the direct
+  evidence, and it's a ten-second look.
+
+  2. Phone Hub / Connected Devices claiming it. This one I underweighted. If the
+  Chromebook and the Pixel are signed into the same Google account, ChromeOS
+  routes the phone through Settings → Connected devices (Phone Hub, Smart Lock)
+  and can keep it out of the plain Bluetooth pairing list. Check whether the
+  Pixel appears there. This theory actually fits one thing the CoD theory
+  doesn't explain well: people pair phones to Chromebooks for audio and
+  tethering all the time, so ChromeOS clearly doesn't hide phones categorically.
+
+  Why it matters which: if it's Phone Hub, the fix may be as cheap as unlinking
+  the phone there or testing with a signed-out Chromebook, and no code changes
+  at all. If it's CoD, the app genuinely cannot present as a keyboard over
+  classic Bluetooth and Phase 0b (BLE, advertising service UUID 0x1812) becomes
+  the real path.
+
+  Recording the confirmed part:
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 12 lines, removed 1 line
+      225  Phase 1 on a Pixel 2 XL types to the Fire HD 10, but the Chrom
+           ebook tablet never shows the
+      226  phone in its Bluetooth pairing list.
+      227  
+      228 -Leading hypothesis is **Class of Device**. The adapter adverti
+          -ses major class *Phone*;                                      
+      228 +**Confirmed:** `chrome://bluetooth-internals` on the Chromeboo
+          +k *does* list the Pixel during a                              
+      229 +scan. So the Chromebook sees it and the Settings UI filters it
+          + out — a display problem, not a                               
+      230 +discovery or discoverability one. Work on the advertising side
+          + cannot fix it.                                               
+      231 +                                                              
+      232 +Two candidate causes remain. **(a) Class of Device** — read th
+          +e Class column in                                             
+      233 +bluetooth-internals to confirm. **(b) Phone Hub / Connected De
+          +vices** — if the Chromebook and                               
+      234 +the phone share a Google account, ChromeOS may route the phone
+          + there and keep it out of the                                 
+      235 +Bluetooth list; check Settings → Connected devices. (b) is wor
+          +th ruling out first because it                                
+      236 +explains something (a) does not: ChromeOS lists phones happily
+          + for audio and tethering, so it                               
+      237 +plainly does not filter phones categorically.                 
+      238 +                                                              
+      239 +For (a), the hypothesis is **Class of Device**. The adapter ad
+          +vertises major class *Phone*;                                 
+      240  registering a HID device app does not change that, and Android
+            gives apps no way to set it (it
+      241  comes from a system property). Fire OS lists everything discov
+           erable and so is unaffected;
+      242  ChromeOS filters its available-devices list by device type, so
+            a phone offering a keyboard is
+● Tell me the Class value from that page and whether the Pixel shows under
+  Connected devices, and I'll know which of the two it is. If it comes back as
+  CoD, I'm ready to start Phase 0b — a timeboxed BLE spike that advertises
+  0x1812 and sees whether the Chromebook lists it as an input device.
+
+✻ Worked for 43s
+
+❯ It shows as not connected. List this under services:                          
+  00000000-0000-0000-0000-000000000000, 00001105-0000-1000-8000-00805f9b34fb,   
+  0000110a-0000-1000-8000-00805f9b34fb, 0000110c-0000-1000-8000-00805f9b34fb,   
+  0000110e-0000-1000-8000-00805f9b34fb, 00001112-0000-1000-8000-00805f9b34fb,   
+  00001115-0000-1000-8000-00805f9b34fb, 00001116-0000-1000-8000-00805f9b34fb,   
+  0000111f-0000-1000-8000-00805f9b34fb, 00001124-0000-1000-8000-00805f9b34fb,   
+  0000112d-0000-1000-8000-00805f9b34fb, 0000112f-0000-1000-8000-00805f9b34fb,   
+  00001132-0000-1000-8000-00805f9b34fb, 00001200-0000-1000-8000-00805f9b34fb    
+
+● Decoding that list — the important entry is in there:
+
+  ┌──────────────────────────┬──────────────────────────────────────────────┐
+  │           UUID           │                   Profile                    │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ 0x1105                   │ OBEX Object Push                             │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ 0x110A / 0x110C / 0x110E │ A2DP Audio Source, AVRCP target & control    │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ 0x1112 / 0x111F          │ Headset & Handsfree Audio Gateway            │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ 0x1115 / 0x1116          │ PAN user, Network Access Point               │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ 0x1124                   │ Human Interface Device ← HIDRA               │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ 0x112D / 0x112F / 0x1132 │ SIM Access, Phonebook Access, Message Access │
+  ├──────────────────────────┼──────────────────────────────────────────────┤
+  │ 0x1200                   │ PnP / Device ID                              │
+  └──────────────────────────┴──────────────────────────────────────────────┘
+
+  0x1124 is HIDRA's SDP record, and the Chromebook has already read it. That's
+  genuinely good news: registration, the SDP record, discoverability and the
+  inquiry response are all working correctly, and the Chromebook knows this
+  device offers a keyboard before any pairing happens. Nothing on our side is
+  broken, so there's no bug to chase in the app.
+
+  It also sharpens the problem. The Chromebook has the HID UUID in hand and
+  still filters the device out — so the filter isn't "does it offer anything I
+  can use". Look at the company 0x1124 is keeping: audio gateway, phonebook,
+  message access, SIM access, PAN. That is the profile fingerprint of a phone,
+  and the adapter's Class of Device says Phone too. ChromeOS classifies the
+  device once, as a phone, and the single HID entry doesn't outvote that.
+
+  Two data points would still settle it, both visible on the row you're already
+  looking at:
+
+  1. The Class value — this is the one I keep asking for and haven't got. It's
+  the direct evidence for the CoD theory.
+  2. Whether the row shows the device as already paired/known. You mentioned
+  "not connected", which is about an active link, not bonding. If BlueZ already
+  has it bonded from an earlier attempt, HIDRA's connect list should already
+  offer it and you're done.
+
+  That said — you don't have to keep iterating on this to make progress. Phase 
+  0b doesn't depend on the answer. A BLE peripheral advertising service UUID
+  0x1812 is classified from its own advertisement, not from the adapter's Class
+  of Device or its classic profile set, so it sidesteps this entire problem
+  rather than fighting it. Your Phase 0 probe already showed the GATT server
+  accepts 0x1812.
+
+  Want me to start Phase 0b? I'd timebox it: build the HOGP service, advertise
+  it, and see whether the Chromebook lists it as an input device — a clear
+  yes/no, and the only route to "generic keyboard" that needs neither root nor
+  phone-side bonding.
+
+✻ Crunched for 50s
+
+❯ start phase 0b                                                                
+
+● Phase 0b. This gets its own spike project so the Phase 0 record stays frozen.
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Write(~/git/arduino-cli/hidra/android/spike-hogp/app/src/main/java/com/hidra/h
+       ogp/HogpPeripheral.kt)
+  ⎿  User rejected write ../spike-hogp/app/src/main/java/com/hidra/hogp/HogpPeri
+     to                  pheral.kt
+       1 package com.hidra.hogp
+       2 
+       3 import android.annotation.SuppressLint
+       4 import android.bluetooth.BluetoothDevice
+       5 import android.bluetooth.BluetoothGatt
+       6 import android.bluetooth.BluetoothGattCharacteristic
+       7 import android.bluetooth.BluetoothGattDescriptor
+       8 import android.bluetooth.BluetoothGattServer
+       9 import android.bluetooth.BluetoothGattServerCallback
+      10 import android.bluetooth.BluetoothGattService
+     … +463 lines
+
+✻ Sautéed for 2m 35s
+
+❯ start phase 0b                                                                
+
+● Creating the HOGP spike at android/spike-hogp/ — a separate project so the
+  Phase 0 record stays frozen. Say the word if you'd rather it lived inside
+  android/hidra/ instead.
+
+● Write(~/git/arduino-cli/hidra/android/spike-hogp/app/src/main/java/com/hidra/h
+       ogp/HogpPeripheral.kt)
+  ⎿  Wrote 467 lines to
+     ../spike-hogp/app/src/main/java/com/hidra/hogp/HogpPeripheral.kt
+       1 package com.hidra.hogp
+       2 
+       3 import android.annotation.SuppressLint
+       4 import android.bluetooth.BluetoothDevice
+       5 import android.bluetooth.BluetoothGatt
+       6 import android.bluetooth.BluetoothGattCharacteristic
+       7 import android.bluetooth.BluetoothGattDescriptor
+       8 import android.bluetooth.BluetoothGattServer
+       9 import android.bluetooth.BluetoothGattServerCallback
+      10 import android.bluetooth.BluetoothGattService
+     … +580 lines (ctrl+o to expand)
+
+● Write(~/git/arduino-cli/hidra/android/spike-hogp/app/src/main/java/com/hidra/h
+       ogp/MainActivity.kt)
+  ⎿  Wrote 189 lines to
+     ../spike-hogp/app/src/main/java/com/hidra/hogp/MainActivity.kt
+       1 package com.hidra.hogp
+       2 
+       3 import android.Manifest
+       4 import android.app.Activity
+       5 import android.content.ClipData
+       6 import android.content.ClipboardManager
+       7 import android.content.Context
+       8 import android.content.pm.PackageManager
+       9 import android.graphics.Color
+      10 import android.graphics.Typeface
+     … +205 lines (ctrl+o to expand)
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Write(~/git/arduino-cli/hidra/android/spike-hogp/README.md)
+  ⎿  Wrote 106 lines to ../spike-hogp/README.md
+       1 # HIDRA Phase 0b — HID over GATT (BLE)
+       3 **The question:** the Chromebook sees the Pixel during a scan an
+         d reads its service list —
+         ut of Bluetooth settings,
+       5 because Class of Device and a dozen phone profiles classify it a
+       6 that. Does advertising as a **BLE** keyboard get past it?
+       7 
+         ntrols, so `0x1812` goes out in
+       9 the advertising data and the host classifies us from that — side
+      10 than fighting it.
+     … +125 lines (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 7 lines, removed 6 lines
+      161  working-with-a-tap, or broken).* Protocol in `spike/README.md`
+           , results into
+      162  `spike/RESULTS.md`.
+      163  
+      164 -**Phase 0b — HOGP, optional.** Only if BLE specifically matter
+          -s (the brief asks for it, the                                 
+      165 -product does not need it). Build the full HID-over-GATT servic
+          -e on top of the `addService` that                             
+      166 -Phase 0 showed is permitted — report map, protocol mode, contr
+          -ol point, report characteristics                              
+      167 -with CCCDs and report-reference descriptors — advertise with t
+          -he keyboard appearance, and see                               
+      168 -whether tablet B bonds and types. Timeboxed: if a host will no
+          -t accept it in a day, classic HID                             
+      169 -already works and this stays shelved.                         
+      164 +**Phase 0b — HOGP.** *Built — see [`spike-hogp/`](spike-hogp/)
+          +. Awaiting a hardware run.*                                   
+      165 +Promoted from optional to necessary by the Chromebook finding 
+          +above: classic Bluetooth cannot                               
+      166 +present the phone as a keyboard, and a BLE peripheral is class
+          +ified from an advertisement the                               
+      167 +app controls. Full HID-over-GATT service on top of the `addSer
+          +vice` Phase 0 showed is permitted                             
+      168 +— report map, HID info, protocol mode, control point, input/ou
+          +tput reports with CCCDs and                                   
+      169 +report-reference descriptors — plus Device Info and Battery, a
+          +dvertising service UUID `0x1812`.                             
+      170 +Timeboxed: if no host accepts it, classic HID still works ever
+          +ywhere except the Chromebook.                                 
+      171  
+      172  **Phase 1 — transport.** *Done — see [`hidra/`](hidra/). Build
+           s; 18 unit tests green; not yet
+      173  run on hardware.* `KeyTransport` + `HidTransport` + `ReportBui
+           lder`, held-key set, release-all,
+
+● Phase 0b is built at android/spike-hogp/ and compiles clean. APK is 2.3 MB,
+  app id com.hidra.hogp — it installs alongside the Phase 0 spike and the Phase
+  1 app, though only one should run at a time since they compete for the
+  Bluetooth stack. Nothing in android/hidra/ was touched.
+
+  What it does: stands up a full HOGP peripheral — Device Information (PnP ID,
+  manufacturer), Battery, and the HID service with report map, HID info,
+  protocol mode, control point, and input/output reports carrying CCCDs and
+  report-reference descriptors — then advertises service UUID 0x1812. The report
+  bytes are byte-identical to the classic build; only the carrier changes.
+
+  Two HOGP details that are easy to get wrong, handled explicitly because both
+  fail silently and then look like host incompatibility: Android's GATT server
+  accepts only one addService per onServiceAdded callback, so the three services
+  go through a queue; and the Report Reference descriptor (0x2908) is present
+  on both reports, without which a host reads the service and ignores it.
+
+  The line to watch for in the log is the CCCD write on the input report:
+
+  *** host SUBSCRIBED to the input report — it is treating us as a keyboard ***
+
+  Everything before that is negotiation. Nothing types without it.
+
+  cd android/spike-hogp && adb install -r
+  app/build/outputs/apk/debug/app-debug.apk
+
+  Then tap 1. advertise and look for the phone in the Chromebook's Bluetooth
+  settings. Full protocol is in spike-hogp/README.md; the stages are
+  deliberately separated because each one failing points somewhere different. If
+  it still doesn't appear even while advertising 0x1812, re-check
+  chrome://bluetooth-internals — if it's visible there with the HID service but
+  Settings still hides it, ChromeOS is filtering on something other than what we
+  advertise, and BLE isn't the answer either.
+
+  One test I'd particularly like the result of is T0b-5: try the Fire HD 10 over
+  BLE too. If HOGP works on both, HIDRA could drop the classic path entirely
+  and use one transport. If it works only on the Chromebook, the app needs both
+  plus a way to choose — meaningfully more work, and better to know now than in
+  Phase 3.
+
+  I can't run any of this — still no device attached here.
+
+✻ Brewed for 3m 18s
+
+※ recap: Goal: turn a Pixel into a Bluetooth keyboard for any tablet or Chromebook. Classic Bluetooth works on the Fire tablet but the Chromebook won't list the phone, so I built a BLE spike. Next: install spike-hogp and see if the Chromebook lists it.
+
+❯ Sipke hogp worked.                                                            
+
+● That's the answer that matters — BLE gets past ChromeOS's filter where classic
+  can't.
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 2 lines, removed 1 line
+      161  working-with-a-tap, or broken).* Protocol in `spike/README.md`
+           , results into
+      162  `spike/RESULTS.md`.
+      163  
+      164 -**Phase 0b — HOGP.** *Built — see [`spike-hogp/`](spike-hogp/)
+          -. Awaiting a hardware run.*                                   
+      164 +**Phase 0b — HOGP.** *Done — passed on hardware 2026-08-10; se
+          +e [`spike-hogp/`](spike-hogp/).                               
+      165 +BLE is a working transport, and the route past the Chromebook'
+          +s classic-Bluetooth filter.*                                  
+      166  Promoted from optional to necessary by the Chromebook finding 
+           above: classic Bluetooth cannot
+      167  present the phone as a keyboard, and a BLE peripheral is class
+           ified from an advertisement the
+      168  app controls. Full HID-over-GATT service on top of the `addSer
+           vice` Phase 0 showed is permitted
+
+● So both transports work, on different devices. That reopens an architecture
+  question that's better settled now than in Phase 3, and it hinges on one test:
+
+  Did you try BLE against the Fire HD 10 as well (T0b-5)? That's the fork:
+
+  - BLE works on the Fire too → one transport for everything. Drop the classic
+  path, delete HidTransport, and the app gets simpler than it is today. Cleanest
+  outcome by far.
+  - BLE works only on the Chromebook → the app carries both and needs a way to
+  choose. KeyTransport was built for exactly this, so it's a new HogpTransport
+  class beside HidTransport and no change above the interface — but it does mean
+  a transport picker in the UI, two connection flows to explain, and twice the
+  pairing surface to test.
+
+  I'd rather not build the two-transport version if one will do.
+
+  Three other things from the run worth capturing while it's fresh, if you have
+  the log — paste it and I'll write up spike-hogp/RESULTS.md properly:
+
+  1. How ChromeOS described it in the pairing list — "keyboard", "input device",
+  or something generic. Tells us whether the 0x1812 advertisement alone did the
+  work.
+  2. Whether all four typing tests passed — particularly hold a 3s, since key
+  repeat over BLE notifications is a different path from classic and is where
+  latency problems would show.
+  3. Reconnect after screen-off (T0b-6). This build deliberately doesn't
+  re-advertise after a disconnect, so it may need a manual stop/advertise.
+  That's a known gap and cheap to fix, but I want to know whether it's the only
+  one — BLE reconnect is historically fussier than classic, and it's the same
+  sore spot Phase 0's T4 never got tested for.
+
+✻ Worked for 27s
+
+❯ Tested on fire tablet, works, too.                                            
+
+● Both hosts on one transport — that's the clean outcome. BLE becomes the
+  primary path.
+
+● Write(~/git/arduino-cli/hidra/android/spike-hogp/RESULTS.md)  ⎿  Wrote 44 lines to ../spike-hogp/RESULTS.md
+      1 # Phase 0b results
+      2 
+      3 | | |
+      4 |---|---|
+      5 | Date | 2026-08-10 |
+      6 | Phone | Google Pixel 2 XL, Android 11 (API 30) |
+      7 | Receiving devices | Chromebook tablet, Fire HD 10 |
+      8 
+      9 ## Outcome — pass, on both hosts
+     … +47 lines (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 4 lines, removed 3 lines
+      132    │      │ @JavascriptInterface  down(usage) / up(usage) / rel
+           easeAll()        │
+      133    │      ▼                                                    
+                            │
+      134    │   KeyTransport  (interface)                               
+                            │
+      135 -  │      ├── HidTransport      → BluetoothHidDevice.sendReport
+          -()   [primary]   │                                            
+      136 -  │      │     └── keeps itself registered; re-registers on re
+          -gistered=false   │                                            
+      137 -  │      └── WsTransport       → the ESP32, if ever needed    
+          -     [fallback]  │                                            
+      135 +  │      ├── HogpTransport     → BLE GATT notify on 0x2A4D    
+          +     [primary]   │                                            
+      136 +  │      │     └── advertises 0x1812; re-advertises after a di
+          +sconnect         │                                            
+      137 +  │      └── HidTransport      → BluetoothHidDevice.sendReport
+          +()   [fallback]  │                                            
+      138 +  │            └── kept, unused: covers hosts that do classic 
+          +but not BLE      │                                            
+      139    │      ▼                                                    
+                            │
+      140    │   ReportBuilder — modifier bitmask + 6 keycode slots, boot
+            protocol        │
+      141    └───────────────────────────────────────────────────────────
+           ─────────────────┘
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 13 lines
+      181  `onAppStatusChanged(registered=false)` as recoverable and re-r
+           egister, and the UI must never
+      182  offer a connect button that quietly does nothing.
+      183  
+      184 +**Phase 1b — switch the app to BLE.** Phase 0b passed on *both
+          +* the Chromebook and the Fire HD                              
+      185 +10, while classic reaches only the Fire. BLE is therefore a su
+          +perset across everything in scope,                            
+      186 +and the app consolidates on it rather than carrying two transp
+          +orts and a picker.                                            
+      187 +                                                              
+      188 +Port `HogpPeripheral` into `hidra/` as `HogpTransport : KeyTra
+          +nsport` and make it the transport                             
+      189 +`MainActivity` uses. Nothing above the interface changes. Then
+          + close the gaps the spike left                                
+      190 +(spike-hogp/RESULTS.md): re-advertise after a disconnect, rele
+          +ase-all on pause, reconnect to a                              
+      191 +bonded host, real battery level.                              
+      192 +                                                              
+      193 +`HidTransport` stays in the tree, unused. It is written, works
+          +, and costs nothing behind the                                
+      194 +interface — cheap insurance for a host that speaks classic but
+          + not BLE. Delete it if that never                             
+      195 +materialises.                                                 
+      196 +                                                              
+      197  **Phase 2 — the keyboard.** `src/web/` into assets, `transport
+           .js` swapped for the bridge,
+      198  WebView wired to `KeyTransport`. At this point it is the PWA, 
+           minus the ESP32. Status pills
+      199  in the existing top bar are repointed at the Bluetooth connect
+           ion state; the battery pill
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 6 lines, removed 1 line
+      236  Per-device testing is then a matrix, not a checklist. Suggeste
+           d minimum before calling it done:
+      237  {Pixel 2 XL, one current Pixel} × {Fire HD 10, Chromebook tabl
+           et}.
+      238  
+      239 -### Known: the Chromebook does not list the phone (2026-08-10)
+      239 +### Resolved: the Chromebook does not list the phone over clas
+          +sic Bluetooth (2026-08-10)                                    
+      240  
+      241 +**Fixed by moving to BLE.** Phase 0b advertises `0x1812` and t
+          +he Chromebook lists, bonds and                                
+      242 +types — as does the Fire HD 10. The investigation below is kep
+          +t because it is the reason the                                
+      243 +architecture changed, and because it is the argument against e
+          +ver going back to classic.                                    
+      244 +                                                              
+      245 +                                                              
+      246  Phase 1 on a Pixel 2 XL types to the Fire HD 10, but the Chrom
+           ebook tablet never shows the
+      247  phone in its Bluetooth pairing list.
+      248  
+
+● Recorded in spike-hogp/RESULTS.md and the plan.
+
+  ┌─────────────┬────────────┬───────────────────┐
+  │             │ Fire HD 10 │ Chromebook tablet │
+  ├─────────────┼────────────┼───────────────────┤
+  │ Classic HID │ works      │ not listed        │
+  ├─────────────┼────────────┼───────────────────┤
+  │ BLE HOGP    │ works      │ works             │
+  └─────────────┴────────────┴───────────────────┘
+
+  BLE is a strict superset across everything in scope, so the app consolidates
+  on one transport rather than carrying two and making you choose. That also
+  means the original brief — "HID keyboard over BLE" — turns out to be exactly
+  right, which I'd argued against in the first plan. The 0x1812 probe you ran in
+  Phase 0 was what reopened it.
+
+  Phase 1b is now the next step: port HogpPeripheral into android/hidra/ as
+  HogpTransport : KeyTransport and make it the transport MainActivity uses.
+  Nothing above the interface changes — that's what the interface was for. Then
+  close the four gaps the spike left, listed in its RESULTS:
+
+  - Re-advertise after a disconnect. The spike stops advertising once a host
+  connects and never resumes, so recovery needs a manual restart. BLE reconnect
+  is fussier than classic, and this is the piece most likely to be annoying in
+  daily use.
+  - Release-all on pause, same stuck-modifier protection the classic build
+  already has.
+  - Reconnect to a bonded host rather than only advertising and waiting.
+  - Real battery level instead of a hardcoded 100% — a nice touch on something
+  the host believes is a keyboard.
+
+  On HidTransport: I'd keep it in the tree, unused. It works, it's behind the
+  interface, and it costs nothing — cheap insurance for a host that speaks
+  classic but not BLE. Happy to delete it instead if you'd rather not carry
+  unused code; it's a one-line call either way.
+
+  Want me to start Phase 1b? After that, Phase 2 is the actual keyboard — the
+  src/web/ layout in a WebView — which is the point where this stops being
+  plumbing and starts looking like the PWA.
+
+✻ Worked for 1m 6s
+
+❯ start phase 1b                                                                
+
+● Write(app/src/main/java/com/hidra/HogpTransport.kt)
+  ⎿  Wrote 527 lines to app/src/main/java/com/hidra/HogpTransport.kt
+       1 package com.hidra
+       2 
+       3 import android.annotation.SuppressLint
+       4 import android.bluetooth.BluetoothDevice
+       5 import android.bluetooth.BluetoothGatt
+       6 import android.bluetooth.BluetoothGattCharacteristic
+       7 import android.bluetooth.BluetoothGattDescriptor
+       8 import android.bluetooth.BluetoothGattServer
+       9 import android.bluetooth.BluetoothGattServerCallback
+      10 import android.bluetooth.BluetoothGattService
+     … +648 lines (ctrl+o to expand)
+
+● Now switching MainActivity over — the BLE flow has no device picker, since the
+  host connects to us:
+
+● Update(app/src/main/java/com/hidra/MainActivity.kt)
+  ⎿  Added 1 line, removed 1 line
+      34   */
+      35  class MainActivity : Activity() {
+      36  
+      37 -    private lateinit var hid: HidTransport                     
+      37 +    private lateinit var hid: HogpTransport                    
+      38  
+      39      private lateinit var stateView: TextView
+      40      private lateinit var logView: TextView
+
+● Update(app/src/main/java/com/hidra/MainActivity.kt)
+  ⎿  Added 1 line, removed 1 line
+      47      override fun onCreate(savedInstanceState: Bundle?) {
+      48          super.onCreate(savedInstanceState)
+      49  
+      50 -        hid = HidTransport(this)                               
+      50 +        hid = HogpTransport(this)                              
+      51          hid.onLog = { m -> runOnUiThread { log(m) } }
+      52          hid.onStatus = { s -> runOnUiThread { render(s) } }
+      53  
+
+● Update(app/src/main/java/com/hidra/MainActivity.kt)
+  ⎿  Added 3 lines, removed 2 lines
+       97              actionButtons[key] = b
+       98              actions.addView(b, LinearLayout.LayoutParams(0, WR
+           AP_CONTENT, 1f))
+       99          }
+      100 -        action("discoverable", "pair") { requestDiscoverable()
+          - }                                                            
+      101 -        action("connect", "connect") { pickHost() }           
+      100 +        // No "connect to…" picker: a BLE peripheral cannot di
+          +al out. HIDRA advertises and the                              
+      101 +        // other device connects to it, the same way any Bluet
+          +ooth keyboard behaves.                                        
+      102          action("disconnect", "disconnect") { hid.disconnect() 
+           }
+      103 +        action("forget", "forget device") { hid.forgetLastHost
+          +() }                                                          
+      104          action("restart", "restart") { hid.stop(); withPermiss
+           ions { hid.start() } }
+      105  
+      106          val keys = LinearLayout(this).apply {
+
+● Update(app/src/main/java/com/hidra/MainActivity.kt)
+  ⎿  Added 2 lines, removed 29 lines
+      164              LinkState.FAILED -> Color.parseColor("#b3261e")
+      165              else -> Color.parseColor("#6c7783")
+      166          })
+      167 -        actionButtons["discoverable"]?.isEnabled = s.state != 
+          -LinkState.STOPPED                                             
+      168 -        actionButtons["connect"]?.isEnabled = s.canConnect    
+      169 -        actionButtons["disconnect"]?.isEnabled = s.state == Li
+          -nkState.CONNECTED                                             
+      167 +        actionButtons["disconnect"]?.isEnabled = hid.currentHo
+          +st != null                                                    
+      168 +        actionButtons["forget"]?.isEnabled = s.state != LinkSt
+          +ate.STOPPED                                                   
+      169          testKeys.forEach { it.isEnabled = s.canType }
+      170          s.detail?.let { log(it) }
+      171      }
+      172  
+      174 -    private fun pickHost() {                                  
+      175 -        val devices = hid.bondedDevices()                     
+      176 -        if (devices.isEmpty()) {                              
+      177 -            toast("no paired devices yet — tap 'pair' and pair
+          - from the other device")                                      
+      178 -            return                                            
+      179 -        }                                                     
+      180 -        val labels = devices.map {                            
+      181 -            val name = try { it.name ?: it.address } catch (e:
+          - SecurityException) { it.address }                            
+      182 -            if (it.address == hid.lastHostAddress) "$name  (la
+          -st used)\n${it.address}"                                      
+      183 -            else "$name\n${it.address}"                       
+      184 -        }.toTypedArray()                                      
+      185 -        AlertDialog.Builder(this)                             
+      186 -            .setTitle("Type to which device?")                
+      187 -            .setItems(labels) { _, i ->                       
+      188 -                if (!hid.connect(devices[i])) toast("could not
+          - start connecting")                                           
+      189 -            }                                                 
+      190 -            .show()                                           
+      191 -    }                                                         
+      192 -                                                              
+      193 -    private fun requestDiscoverable() {                       
+      194 -        startActivityForResult(                               
+      195 -            Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABL
+          -E)                                                            
+      196 -                .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_
+          -DURATION, 300), REQ_DISCOVERABLE)                             
+      197 -        log("discoverable for 300s — now pair with this phone 
+          -from the other device")                                       
+      198 -    }                                                         
+      199 -                                                              
+      173      // -------------------------------------------------------
+           ----------- permissions
+      174  
+      175      /**
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Build's green. Cleaning up what the switch left stranded:
+
+  Searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+● Update(app/src/main/java/com/hidra/KeyTransport.kt)
+  ⎿  Added 2 lines, removed 1 line
+      35      /** Starting up, or recovering — obtaining the profile prox
+          y / registering. */
+      36      STARTING,
+      37  
+      38 -    /** Registered as a keyboard, but no device is listening ye
+         -t. */                                                          
+      38 +    /** Advertising as a keyboard, but no device has connected 
+         +yet. */                                                        
+      39      READY,
+      40  
+      41 +    /** A device is connected but has not yet accepted us as it
+         +s keyboard. */                                                 
+      42      CONNECTING,
+      43  
+      44      /** A device is connected. This is the only state in which 
+          keys go anywhere. */
+
+● Update(app/src/main/java/com/hidra/KeyTransport.kt)
+  ⎿  Added 2 lines, removed 3 lines
+      59      val detail: String? = null
+      60  ) {
+      61      val canType get() = state == LinkState.CONNECTED
+      62 -    val canConnect get() = state == LinkState.READY            
+      62  
+      63      fun describe(): String = when (state) {
+      64          LinkState.STOPPED -> "stopped"
+      65          LinkState.STARTING -> detail ?: "starting…"
+      67 -        LinkState.READY -> "ready — pair or connect a device"  
+      68 -        LinkState.CONNECTING -> "connecting to ${hostName ?: "d
+         -evice"}…"                                                      
+      66 +        LinkState.READY -> "ready — connect to HIDRA from the o
+         +ther device"                                                   
+      67 +        LinkState.CONNECTING -> "${hostName ?: "device"} connec
+         +ted, accepting the keyboard…"                                  
+      68          LinkState.CONNECTED -> "typing to ${hostName ?: "device
+          "}"
+      69          LinkState.FAILED -> detail ?: "failed"
+      70      }
+
+● Update(app/src/main/java/com/hidra/MainActivity.kt)
+  ⎿  Added 5 lines, removed 1 line
+      20  import java.util.Locale
+      21  
+      22  /**
+      23 - * Phase 1 scaffolding: connect to a device, prove keys flow, w
+         -atch the link state.                                           
+      23 + * Phase 1 scaffolding: advertise as a keyboard, prove keys flo
+         +w, watch the link state.                                       
+      24   *
+      25 + * There is no "connect" button. Over BLE the phone is the peri
+         +pheral — it advertises, and the                                
+      26 + * other device connects to it from its own Bluetooth settings,
+         + exactly as it would to any                                    
+      27 + * keyboard. HIDRA's job is to be findable and to remember who 
+         +connected last.                                                
+      28 + *                                                             
+      29   * The keyboard itself arrives in Phase 2, when this content vi
+          ew is replaced by the WebView
+      30   * hosting `src/web/`. Everything below the [KeyTransport] inte
+          rface stays as it is.
+      31   *
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Update(README.md)
+  ⎿  Added 38 lines, removed 16 lines
+       6  Feasibility, architecture and phasing live in [`../PLAN.md`](..
+          /PLAN.md). The Phase 0 spike that
+       7  proved it works on hardware is in [`../spike/`](../spike/); thi
+          s is the real app.
+       8  
+       9 -## Status — Phase 1                                            
+       9 +## Status — Phase 1b                                           
+      10  
+      11 -Transport layer complete, keyboard UI not yet. The screen is sc
+         -affolding: pair, connect, and a                                
+      12 -strip of six real keys to prove the link. **Phase 2 replaces th
+         -at screen with the `src/web/`                                  
+      13 -keyboard in a WebView**; nothing below `KeyTransport` changes w
+         -hen it does.                                                   
+      11 +Transport layer complete and running over **BLE**, keyboard UI 
+         +not yet. The screen is                                         
+      12 +scaffolding: a link state, three buttons and a strip of six rea
+         +l keys. **Phase 2 replaces that                                
+      13 +screen with the `src/web/` keyboard in a WebView**; nothing bel
+         +ow `KeyTransport` changes.                                     
+      14  
+      15  | File | Role |
+      16  |---|---|
+      17  | `ReportBuilder.kt` | the 8-byte boot report; modifier folding
+          , 6KRO, rollover. Pure Kotlin, unit-tested |
+      18  | `KeyTransport.kt` | what the UI is allowed to know: down/up/r
+          eleaseAll and a link state |
+      19 -| `HidTransport.kt` | classic Bluetooth HID — registration, rec
+         -overy, connection, `sendReport` |                              
+      19 +| `HogpTransport.kt` | **the transport** — BLE HID-over-GATT: s
+         +ervices, advertising, notify |                                 
+      20 +| `HidTransport.kt` | classic Bluetooth HID. Unused; kept as fa
+         +llback, see below |                                            
+      21  | `MainActivity.kt` | Phase 1 scaffolding, replaced in Phase 2 
+          |
+      22  
+      22 -## Two things this does that the spike did not                 
+      23 +## Why BLE and not classic Bluetooth                           
+      24  
+      24 -**Registration is treated as temporary.** Phase 0 lost its HID 
+         -registration after five minutes                                
+      25 -with no warning, and every later `connect()` failed silently   
+      26 -([`../spike/RESULTS.md`](../spike/RESULTS.md) §T1b). `HidTransp
+         -ort` treats                                                    
+      27 -`registered=false` as routine: it re-registers with backoff fro
+         -m 1 s to 30 s, and only reports                                
+      28 -failure once recovery has genuinely given up.                  
+      25 +Both work. Classic only reaches *some* devices:                
+      26  
+      30 -**No control is offered unless it would work.** `LinkStatus.can
+         -Type` / `canConnect` drive button                              
+      31 -enablement from the transport's own state, so the silent-failur
+         -e mode that cost half an hour of                               
+      32 -Phase 0 testing cannot recur.                                  
+      27 +| | Fire HD 10 | Chromebook tablet |                           
+      28 +|---|---|---|                                                  
+      29 +| Classic HID | works | **never appears in the pairing list** |
+      30 +| BLE HOGP | works | works |                                   
+      31  
+      34 -Keys are also released on `onPause` — a held modifier plus a ba
+         -ckgrounded app leaves the                                      
+      35 -receiving device with a stuck Shift and infinite repeat.       
+      32 +The Chromebook filters the phone out because Class of Device an
+         +d a dozen phone profiles                                       
+      33 +classify it as a phone, and no app can change that — `setBlueto
+         +othClass()` is a privileged                                    
+      34 +system API. A BLE peripheral is classified from an advertisemen
+         +t the app *does* control, so                                   
+      35 +HIDRA advertises service UUID `0x1812` and is taken for a keybo
+         +ard. Full story in                                             
+      36 +[`../PLAN.md`](../PLAN.md) §6 and [`../spike-hogp/RESULTS.md`](
+         +../spike-hogp/RESULTS.md).                                     
+      37  
+      38 +`HidTransport` stays in the tree, unused, as insurance for a ho
+         +st that speaks classic but not                                 
+      39 +BLE. Delete it if that never turns up.                         
+      40 +                                                               
+      41 +## There is no connect button                                  
+      42 +                                                               
+      43 +Over BLE the phone is the peripheral. It advertises; the other 
+         +device connects to it from its                                 
+      44 +own Bluetooth settings, exactly as it would to any keyboard. HI
+         +DRA cannot dial out — what it                                  
+      45 +does instead is keep advertising and re-offer itself to the dev
+         +ice that connected last.                                       
+      46 +                                                               
+      47 +## What this does that the spikes did not                      
+      48 +                                                               
+      49 +- **Re-advertises after a disconnect**, so a host that sleeps o
+         +r wanders out of range can come                                
+      50 +  back without the app being restarted. The HOGP spike stopped 
+         +dead.                                                          
+      51 +- **Distinguishes connected from usable.** A device can be conn
+         +ected and still not have                                       
+      52 +  subscribed to the input report, in which case nothing types. 
+         +That is its own link state, and                                
+      53 +  the keys stay disabled until the host actually accepts the ke
+         +yboard.                                                        
+      54 +- **Releases every key on `onPause`** — a held modifier plus a 
+         +backgrounded app leaves the                                    
+      55 +  receiving device with a stuck Shift and infinite repeat.     
+      56 +- **Reports the phone's real battery** to the host, which shows
+         + it as the keyboard's battery.                                 
+      57 +  The spike hardcoded 100%.                                    
+      58 +                                                               
+      59  ## Build
+      60  
+      61  Toolchain: SDK 35 at `~/android-sdk`, Gradle wrapper in the pro
+          ject, JDK 17. On a fresh clone:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 2 lines, removed 1 line
+      181  `onAppStatusChanged(registered=false)` as recoverable and re-r
+           egister, and the UI must never
+      182  offer a connect button that quietly does nothing.
+      183  
+      184 -**Phase 1b — switch the app to BLE.** Phase 0b passed on *both
+          -* the Chromebook and the Fire HD                              
+      184 +**Phase 1b — switch the app to BLE.** *Done — see [`hidra/`](h
+          +idra/). Builds; 18 tests green;                               
+      185 +not yet run on hardware.* Phase 0b passed on *both* the Chrome
+          +book and the Fire HD                                          
+      186  10, while classic reaches only the Fire. BLE is therefore a su
+           perset across everything in scope,
+      187  and the app consolidates on it rather than carrying two transp
+           orts and a picker.
+      188  
+● Phase 1b done. android/hidra/ now runs on BLE.
+
+  What changed: HogpTransport : KeyTransport is the transport MainActivity uses.
+  It reuses the same unit-tested ReportBuilder, so the bytes on the wire are
+  identical to the classic path — only the carrier differs. HidTransport stays
+  in the tree, unused, as insurance for a host that speaks classic but not BLE.
+
+  The connect button is gone, and that's correct rather than a regression: over
+  BLE the phone is the peripheral. It advertises; the other device connects from
+  its own Bluetooth settings, like any keyboard. HIDRA can't dial out.
+
+  The four gaps from the spike are closed:
+
+  - Re-advertising after a disconnect. The spike went dead once a host dropped;
+  now it resumes advertising and re-offers itself to the last device via
+  connect(autoConnect = true), which is how a real BLE keyboard comes back after
+  the host sleeps.
+  - Real battery, read from the phone and pushed on change — the host displays
+  it as the keyboard's battery. The spike hardcoded 100%.
+  - Release-all on pause, carried over.
+  - Last-host memory in prefs, with a forget device button.
+
+  One thing I added that wasn't on the list. Connected and usable are not the
+  same state over BLE: a host can connect and never subscribe to the input
+  report, in which case nothing types and the old UI would have looked ready.
+  That's now its own state — the status line says the device is connected but
+  hasn't accepted the keyboard, and the keys stay disabled until the CCCD write
+  arrives. Same principle as the Phase 0 lesson about never showing a control
+  that silently does nothing.
+
+  Verification: ./gradlew test assembleDebug green, 18 tests, 0 failures, APK
+  2.4 MB. Not run on hardware — no device here.
+
+  Two things worth watching when you install it. Reconnect after screen-off was
+  never tested in Phase 0b (T0b-6) and is the main thing this build tries to
+  fix, so it's the real test. And the CONNECTING → CONNECTED transition should
+  be visible in the status line as the host subscribes — if it sticks at
+  "accepting the keyboard…", the host connected but never took the input report,
+  which is a different problem from failing to connect.
+
+  Next is Phase 2 — the src/web/ layout in a WebView, where this finally looks
+  like the PWA. Worth remembering the sizing issue from §6 before I start: the
+  full 15-column layout on a 5.7-inch Pixel 2 XL gives about 7 mm keys, so the
+  function row wants to become a toggle.
+
+✻ Worked for 4m 39s
+
+❯ start phase 2                                                                 
+
+● Phase 2 — the keyboard. First the Android-side transport that replaces
+  transport.js, keeping src/web/ as the single source of truth:
+
+● Write(app/src/main/assets/transport.js)
+  ⎿  Wrote 75 lines to app/src/main/assets/transport.js
+       1 // HIDRA transport, Android build.
+       3 // Shadows src/web/transport.js — same class name, same three me
+         mbers app.js uses (send,
+         in this process rather than a
+         .html are copied from src/web/
+       6 // verbatim at build time and must stay untouched: the ESP32 fir
+       7 //
+       8 // The line protocol is kept exactly as it was ("D 4 0", "U 4 0"
+       9 // ends are now in one process. It costs nothing, it keeps app.j
+      10 // and the protocol is already documented and proven.
+     … +81 lines (ctrl+o to expand)
+
+● Write(app/src/main/java/com/hidra/MainActivity.kt)
+  ⎿  Added 150 lines, removed 141 lines
+        1  package com.hidra
+        2  
+        3  import android.Manifest
+        4 +import android.annotation.SuppressLint                        
+        5  import android.app.Activity
+        6 +import android.content.pm.ApplicationInfo                     
+        7  import android.content.pm.PackageManager
+        6 -import android.graphics.Color                                 
+        7 -import android.graphics.Typeface                              
+        8 +import android.net.Uri                                        
+        9  import android.os.Build
+       10  import android.os.Bundle
+       10 -import android.text.method.ScrollingMovementMethod            
+       11 -import android.view.MotionEvent                               
+       11 +import android.os.Handler                                     
+       12 +import android.os.Looper                                      
+       13 +import android.util.Log                                       
+       14  import android.view.View
+       13 -import android.view.ViewGroup.LayoutParams.MATCH_PARENT       
+       14 -import android.view.ViewGroup.LayoutParams.WRAP_CONTENT       
+       15 -import android.widget.Button                                  
+       16 -import android.widget.LinearLayout                            
+       17 -import android.widget.TextView                                
+       18 -import java.text.SimpleDateFormat                             
+       19 -import java.util.Date                                         
+       20 -import java.util.Locale                                       
+       15 +import android.view.WindowManager                             
+       16 +import android.webkit.JavascriptInterface                     
+       17 +import android.webkit.WebResourceRequest                      
+       18 +import android.webkit.WebResourceResponse                     
+       19 +import android.webkit.WebView                                 
+       20 +import android.webkit.WebViewClient                           
+       21 +import java.io.IOException                                    
+       22  
+       23  /**
+       23 - * Phase 1 scaffolding: advertise as a keyboard, prove keys fl
+          -ow, watch the link state.                                     
+       24 + * The keyboard. `src/web/` rendered in a WebView, typing over
+          + BLE.                                                         
+       25   *
+       25 - * There is no "connect" button. Over BLE the phone is the per
+          -ipheral — it advertises, and the                              
+       26 - * other device connects to it from its own Bluetooth settings
+          -, exactly as it would to any                                  
+       27 - * keyboard. HIDRA's job is to be findable and to remember who
+          - connected last.                                              
+       26 + * The layout, the latching modifiers, the multi-touch chords 
+          +and the shifted legends are the                               
+       27 + * PWA's — the same files the ESP32 serves, copied into assets
+          + at build time and not forked.                                
+       28 + * Only `transport.js` differs: the Android one bridges to [Ke
+          +yTransport] instead of opening a                              
+       29 + * WebSocket. That is the whole of Phase 2.                   
+       30   *
+       29 - * The keyboard itself arrives in Phase 2, when this content v
+          -iew is replaced by the WebView                                
+       30 - * hosting `src/web/`. Everything below the [KeyTransport] int
+          -erface stays as it is.                                        
+       31 - *                                                            
+       32 - * Every control here is disabled unless it would actually do 
+          -something — Phase 0's registration                            
+       33 - * expiry made a connect button that silently failed, and that
+          - is not happening twice.                                      
+       31 + * Assets are served from a synthetic `https://hidra.local/` o
+          +rigin rather than                                             
+       32 + * `file:///android_asset/`, because app.js treats an empty `l
+          +ocation.host` as "no device, render                           
+       33 + * a preview" — which is exactly right when you open the page 
+          +from disk, and exactly wrong here.                            
+       34   */
+       35  class MainActivity : Activity() {
+       36  
+       37 -    private lateinit var hid: HogpTransport                   
+       37 +    private lateinit var link: HogpTransport                  
+       38 +    private lateinit var web: WebView                         
+       39 +    private val main = Handler(Looper.getMainLooper())        
+       40  
+       39 -    private lateinit var stateView: TextView                  
+       40 -    private lateinit var logView: TextView                    
+       41 -    private val actionButtons = mutableMapOf<String, Button>()
+       42 -    private val testKeys = mutableListOf<View>()              
+       41 +    private var pageReady = false                             
+       42  
+       44 -    private val stamp = SimpleDateFormat("HH:mm:ss.SSS", Local
+          -e.US)                                                         
+       45 -    private val lines = StringBuilder()                       
+       46 -                                                              
+       43 +    @SuppressLint("SetJavaScriptEnabled")                     
+       44      override fun onCreate(savedInstanceState: Bundle?) {
+       45          super.onCreate(savedInstanceState)
+       46  
+       50 -        hid = HogpTransport(this)                             
+       51 -        hid.onLog = { m -> runOnUiThread { log(m) } }         
+       52 -        hid.onStatus = { s -> runOnUiThread { render(s) } }   
+       47 +        // A keyboard the user is looking at must not sleep un
+          +der them.                                                     
+       48 +        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_S
+          +CREEN_ON)                                                     
+       49 +        goImmersive()                                         
+       50  
+       54 -        setContentView(buildUi())                             
+       55 -        render(hid.status)                                    
+       51 +        link = HogpTransport(this)                            
+       52 +        link.onLog = { m -> Log.i(TAG, m) }                   
+       53 +        link.onStatus = { s -> main.post { pushStatus(s) } }  
+       54  
+       57 -        log("HIDRA phase 1")                                  
+       58 -        log("${Build.MANUFACTURER} ${Build.MODEL}, Android ${B
+          -uild.VERSION.RELEASE} " +                                     
+       59 -            "(API ${Build.VERSION.SDK_INT})")                 
+       60 -        withPermissions { hid.start() }                       
+       55 +        web = WebView(this).apply {                           
+       56 +            settings.javaScriptEnabled = true                 
+       57 +            settings.setSupportZoom(false)                    
+       58 +            settings.builtInZoomControls = false              
+       59 +            // The layout sizes itself from the viewport; a sy
+          +stem font scale of 1.3 would push                             
+       60 +            // key legends out of their keys.                 
+       61 +            settings.textZoom = 100                           
+       62 +            overScrollMode = View.OVER_SCROLL_NEVER           
+       63 +            isVerticalScrollBarEnabled = false                
+       64 +            isHorizontalScrollBarEnabled = false              
+       65 +            webViewClient = AssetClient()                     
+       66 +            addJavascriptInterface(Bridge(), "HidraNative")   
+       67 +        }                                                     
+       68 +        if (applicationInfo.flags and ApplicationInfo.FLAG_DEB
+          +UGGABLE != 0) {                                               
+       69 +            WebView.setWebContentsDebuggingEnabled(true)      
+       70 +        }                                                     
+       71 +        setContentView(web)                                   
+       72 +                                                              
+       73 +        web.loadUrl("https://$ASSET_HOST/index.html")         
+       74 +                                                              
+       75 +        withPermissions { link.start() }                      
+       76      }
+       77  
+       78      /**
+       64 -     * Releasing on pause is not optional. A held modifier plu
+          -s a backgrounded app leaves the                               
+       65 -     * receiving device with a stuck Shift and an infinite key
+          - repeat, which is exactly the                                 
+       66 -     * failure the firmware's watchdog exists to prevent. The 
+          -link itself stays up.                                         
+       79 +     * Backgrounding stops our events but not the far end's ke
+          +y repeat, so let go of everything                             
+       80 +     * first. The link itself stays up.                       
+       81       */
+       82      override fun onPause() {
+       69 -        hid.releaseAll()                                      
+       83 +        link.releaseAll()                                     
+       84          super.onPause()
+       85      }
+       86  
+       87 +    override fun onResume() {                                 
+       88 +        super.onResume()                                      
+       89 +        goImmersive()                                         
+       90 +        pushStatus(link.status)                               
+       91 +    }                                                         
+       92 +                                                              
+       93      override fun onDestroy() {
+       74 -        hid.stop()                                            
+       94 +        link.stop()                                           
+       95 +        web.destroy()                                         
+       96          super.onDestroy()
+       97      }
+       98  
+       78 -    // -------------------------------------------------------
+          ------------ ui                                                
+       99 +    override fun onWindowFocusChanged(hasFocus: Boolean) {    
+      100 +        super.onWindowFocusChanged(hasFocus)                  
+      101 +        if (hasFocus) goImmersive()                           
+      102 +    }                                                         
+      103  
+       80 -    private fun buildUi(): View {                             
+       81 -        stateView = TextView(this).apply {                    
+       82 -            textSize = 18f                                    
+       83 -            setTypeface(Typeface.DEFAULT_BOLD)                
+       84 -            setPadding(28, 28, 28, 8)                         
+       85 -        }                                                     
+      104 +    @Suppress("DEPRECATION")                                  
+      105 +    private fun goImmersive() {                               
+      106 +        window.decorView.systemUiVisibility =                 
+      107 +            View.SYSTEM_UI_FLAG_LAYOUT_STABLE or              
+      108 +            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or     
+      109 +            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or          
+      110 +            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or            
+      111 +            View.SYSTEM_UI_FLAG_FULLSCREEN or                 
+      112 +            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY              
+      113 +    }                                                         
+      114  
+       87 -        val actions = LinearLayout(this).apply {              
+       88 -            orientation = LinearLayout.HORIZONTAL             
+       89 -            setPadding(16, 0, 16, 0)                          
+       90 -        }                                                     
+       91 -        fun action(key: String, label: String, onClick: () -> 
+          -Unit) {                                                       
+       92 -            val b = Button(this).apply {                      
+       93 -                text = label                                  
+       94 -                textSize = 11f                                
+       95 -                setOnClickListener { onClick() }              
+       96 -            }                                                 
+       97 -            actionButtons[key] = b                            
+       98 -            actions.addView(b, LinearLayout.LayoutParams(0, WR
+          -AP_CONTENT, 1f))                                              
+       99 -        }                                                     
+      100 -        // No "connect to…" picker: a BLE peripheral cannot di
+          -al out. HIDRA advertises and the                              
+      101 -        // other device connects to it, the same way any Bluet
+          -ooth keyboard behaves.                                        
+      102 -        action("disconnect", "disconnect") { hid.disconnect() 
+          -}                                                             
+      103 -        action("forget", "forget device") { hid.forgetLastHost
+          -() }                                                          
+      104 -        action("restart", "restart") { hid.stop(); withPermiss
+          -ions { hid.start() } }                                        
+      115 +    // -------------------------------------------------------
+          +----------- page → keys                                       
+      116  
+      106 -        val keys = LinearLayout(this).apply {                 
+      107 -            orientation = LinearLayout.HORIZONTAL             
+      108 -            setPadding(16, 16, 16, 16)                        
+      109 -        }                                                     
+      110 -        // A strip of real keys, pressed and released like the
+          - Phase 2 UI will do it. Enough to                             
+      111 -        // prove held modifiers and chords work before the rea
+          -l layout exists.                                              
+      112 -        for ((label, usage) in listOf(                        
+      113 -            "a" to 0x04, "b" to 0x05, "⏎" to 0x28, "⌫" to 0x2A
+          -,                                                             
+      114 -            "shift" to 0xE1, "ctrl" to 0xE0                   
+      115 -        )) {                                                  
+      116 -            val b = Button(this).apply {                      
+      117 -                text = label                                  
+      118 -                textSize = 13f                                
+      119 -                setOnTouchListener { v, ev ->                 
+      120 -                    when (ev.action) {                        
+      121 -                        MotionEvent.ACTION_DOWN -> { hid.keyDo
+          -wn(usage); v.isPressed = true }                               
+      122 -                        MotionEvent.ACTION_UP, MotionEvent.ACT
+          -ION_CANCEL -> {                                               
+      123 -                            hid.keyUp(usage); v.isPressed = fa
+          -lse                                                           
+      124 -                        }                                     
+      125 -                    }                                         
+      126 -                    true                                      
+      127 -                }                                             
+      117 +    /**                                                       
+      118 +     * app.js speaks the same newline protocol it speaks to th
+          +e firmware. Both ends are in one                              
+      119 +     * process now, but keeping the wire format means app.js i
+          +s byte-identical across the two                               
+      120 +     * builds — which is the point of the exercise.           
+      121 +     *                                                        
+      122 +     * JavaScript bridge calls arrive on a binder thread; the 
+          +transport expects the main thread.                            
+      123 +     */                                                       
+      124 +    private inner class Bridge {                              
+      125 +        @JavascriptInterface                                  
+      126 +        fun ready() {                                         
+      127 +            main.post {                                       
+      128 +                pageReady = true                              
+      129 +                pushStatus(link.status)                       
+      130 +                Log.i(TAG, "keyboard page ready")             
+      131              }
+      129 -            testKeys += b                                     
+      130 -            keys.addView(b, LinearLayout.LayoutParams(0, WRAP_
+          -CONTENT, 1f))                                                 
+      132          }
+      133  
+      133 -        val panic = Button(this).apply {                      
+      134 -            text = "release all"                              
+      135 -            textSize = 11f                                    
+      136 -            setOnClickListener { hid.releaseAll(); log("releas
+          -e all") }                                                     
+      134 +        @JavascriptInterface                                  
+      135 +        fun send(line: String) {                              
+      136 +            main.post { handle(line) }                        
+      137          }
+      138 +    }                                                         
+      139  
+      139 -        logView = TextView(this).apply {                      
+      140 -            typeface = Typeface.MONOSPACE                     
+      141 -            textSize = 10f                                    
+      142 -            setPadding(28, 8, 28, 28)                         
+      143 -            setTextColor(Color.parseColor("#9aa4b0"))         
+      144 -            movementMethod = ScrollingMovementMethod()        
+      140 +    private fun handle(line: String) {                        
+      141 +        val parts = line.trim().split(' ')                    
+      142 +        when (parts.firstOrNull()) {                          
+      143 +            "D" -> parts.getOrNull(1)?.toIntOrNull()?.let { li
+          +nk.keyDown(it) }                                              
+      144 +            "U" -> parts.getOrNull(1)?.toIntOrNull()?.let { li
+          +nk.keyUp(it) }                                                
+      145 +            "R" -> link.releaseAll()                          
+      146 +            "P" -> Unit                       // app.js keeps 
+          +the firmware's watchdog fed                                   
+      147 +            else -> Log.w(TAG, "unhandled line from the page: 
+          +$line")                                                       
+      148          }
+      149 +    }                                                         
+      150  
+      147 -        return LinearLayout(this).apply {                     
+      148 -            orientation = LinearLayout.VERTICAL               
+      149 -            addView(stateView, LinearLayout.LayoutParams(MATCH
+          -_PARENT, WRAP_CONTENT))                                       
+      150 -            addView(actions, LinearLayout.LayoutParams(MATCH_P
+          -ARENT, WRAP_CONTENT))                                         
+      151 -            addView(keys, LinearLayout.LayoutParams(MATCH_PARE
+          -NT, WRAP_CONTENT))                                            
+      152 -            addView(panic, LinearLayout.LayoutParams(MATCH_PAR
+          -ENT, WRAP_CONTENT).apply {                                    
+      153 -                marginStart = 16; marginEnd = 16              
+      154 -            })                                                
+      155 -            addView(logView, LinearLayout.LayoutParams(MATCH_P
+          -ARENT, 0).apply { weight = 1f })                              
+      151 +    // -------------------------------------------------------
+          +----------- keys → page                                       
+      152 +                                                              
+      153 +    /**                                                       
+      154 +     * Drives the status pills app.js already knows how to ren
+          +der: the `ws` pill and the                                    
+      155 +     * greyed-out veil follow "can I type right now", the `ble
+          +` pill follows whether a device is                            
+      156 +     * connected at all, and the battery is the phone's.      
+      157 +     */                                                       
+      158 +    private fun pushStatus(s: LinkStatus) {                   
+      159 +        if (!pageReady) return                                
+      160 +        js("window.HIDRA_ANDROID.status(${s.canType})")       
+      161 +        val connected = if (link.currentHost != null) 1 else 0
+      162 +        js("window.HIDRA_ANDROID.line('S ble=$connected batt=$
+          +{link.batteryPercent()}')")                                   
+      163 +    }                                                         
+      164 +                                                              
+      165 +    private fun js(code: String) = web.evaluateJavascript(code
+          +, null)                                                       
+      166 +                                                              
+      167 +    // -------------------------------------------------------
+          +----------- assets                                            
+      168 +                                                              
+      169 +    /**                                                       
+      170 +     * Serves `src/web/` from a made-up origin. Nothing leaves
+          + the device — requests are                                    
+      171 +     * answered from assets before any network is touched.    
+      172 +     */                                                       
+      173 +    private inner class AssetClient : WebViewClient() {       
+      174 +        override fun shouldInterceptRequest(                  
+      175 +            view: WebView, request: WebResourceRequest        
+      176 +        ): WebResourceResponse? {                             
+      177 +            val url: Uri = request.url                        
+      178 +            if (!url.host.equals(ASSET_HOST, ignoreCase = true
+          +)) return null                                                
+      179 +            val path = url.path?.trimStart('/')?.ifEmpty { "in
+          +dex.html" } ?: "index.html"                                   
+      180 +            return try {                                      
+      181 +                WebResourceResponse(mimeOf(path), "utf-8", ass
+          +ets.open(path))                                               
+      182 +            } catch (e: IOException) {                        
+      183 +                Log.w(TAG, "no such asset: $path")            
+      184 +                null                                          
+      185 +            }                                                 
+      186          }
+      187      }
+      188  
+      159 -    /** One place decides what is usable, driven entirely by t
+          -he transport's own state. */                                  
+      160 -    private fun render(s: LinkStatus) {                       
+      161 -        stateView.text = s.describe()                         
+      162 -        stateView.setTextColor(when (s.state) {               
+      163 -            LinkState.CONNECTED -> Color.parseColor("#1f8f68")
+      164 -            LinkState.FAILED -> Color.parseColor("#b3261e")   
+      165 -            else -> Color.parseColor("#6c7783")               
+      166 -        })                                                    
+      167 -        actionButtons["disconnect"]?.isEnabled = hid.currentHo
+          -st != null                                                    
+      168 -        actionButtons["forget"]?.isEnabled = s.state != LinkSt
+          -ate.STOPPED                                                   
+      169 -        testKeys.forEach { it.isEnabled = s.canType }         
+      170 -        s.detail?.let { log(it) }                             
+      189 +    private fun mimeOf(path: String) = when {                 
+      190 +        path.endsWith(".html") -> "text/html"                 
+      191 +        path.endsWith(".css") -> "text/css"                   
+      192 +        path.endsWith(".js") -> "application/javascript"      
+      193 +        else -> "application/octet-stream"                    
+      194      }
+      195  
+      196      // -------------------------------------------------------
+           ----------- permissions
+      197  
+      175 -    /**                                                       
+      176 -     * Two worlds, both supported: runtime BLUETOOTH_CONNECT/A
+          -DVERTISE on Android 12+, and                                  
+      177 -     * install-time grants on the Pixel 2 XL (API 30, its ceil
+          -ing). The runtime path is the one                             
+      178 -     * Phase 0 never exercised.                               
+      179 -     */                                                       
+      198 +    /** Runtime BLUETOOTH_CONNECT/ADVERTISE on Android 12+; in
+          +stall-time below that. */                                     
+      199      private fun withPermissions(then: () -> Unit) {
+      200          if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) { t
+           hen(); return }
+      201          val missing = listOf(Manifest.permission.BLUETOOTH_CON
+           NECT,
+     ...
+      213          if (results.isNotEmpty() && results.all { it == Packag
+           eManager.PERMISSION_GRANTED }) {
+      214              pending?.invoke()
+      215          } else {
+      197 -            log("Bluetooth permission denied — HIDRA cannot ac
+          -t as a keyboard without it")                                  
+      198 -            render(LinkStatus(LinkState.FAILED, detail = "Blue
+          -tooth permission denied"))                                    
+      216 +            Log.e(TAG, "Bluetooth permission denied — HIDRA ca
+          +nnot be a keyboard without it")                               
+      217          }
+      218          pending = null
+      219      }
+      220  
+      203 -    // -------------------------------------------------------
+          ------------ misc                                              
+      204 -                                                              
+      205 -    private fun log(m: String) {                              
+      206 -        lines.append(stamp.format(Date())).append("  ").append
+          -(m).append('\n')                                              
+      207 -        logView.text = lines                                  
+      208 -        val bottom = logView.layout?.getLineTop(logView.lineCo
+          -unt) ?: 0                                                     
+      209 -        val visible = logView.height - logView.paddingTop - lo
+          -gView.paddingBottom                                           
+      210 -        if (bottom > visible) logView.scrollTo(0, bottom - vis
+          -ible)                                                         
+      211 -    }                                                         
+      212 -                                                              
+      213 -                                                              
+      221      companion object {
+      222 +        private const val TAG = "HIDRA"                       
+      223 +        private const val ASSET_HOST = "hidra.local"          
+      224          private const val REQ_PERMISSIONS = 1
+      225      }
+      226  }
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Update(app/src/main/java/com/hidra/HogpTransport.kt)
+  ⎿  Added 2 lines, removed 1 line
+      423          watchingBattery = false
+      424      }
+      425  
+      426 -    private fun batteryPercent(): Int {                       
+      426 +    /** The phone's charge, which the host displays as the key
+          +board's battery. */                                           
+      427 +    fun batteryPercent(): Int {                               
+      428          val bm = app.getSystemService(Context.BATTERY_SERVICE)
+            as BatteryManager?
+      429          val level = bm?.getIntProperty(BatteryManager.BATTERY_
+           PROPERTY_CAPACITY) ?: -1
+      430          return level.coerceIn(0, 100).let { if (it == 0) 100 e
+           lse it }
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Build's green, but the asset-copy task is the part most likely to be silently
+  wrong. Verifying what's actually in the APK:
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+● Build failed after the manifest edit — let me see why:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● NoTitleBar is the Holo naming; Material uses NoActionBar:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Now the drift test properly — does an edit in src/web/ actually reach the APK?
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Drift test passes — an edit in src/web/ lands in the APK, and src/web/ is
+  untouched afterwards. Updating the docs:
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Update(~/git/arduino-cli/hidra/android/PLAN.md)
+  ⎿  Added 9 lines, removed 4 lines
+      195  interface — cheap insurance for a host that speaks classic but
+            not BLE. Delete it if that never
+      196  materialises.
+      197  
+      198 -**Phase 2 — the keyboard.** `src/web/` into assets, `transport
+          -.js` swapped for the bridge,                                  
+      199 -WebView wired to `KeyTransport`. At this point it is the PWA, 
+          -minus the ESP32. Status pills                                 
+      200 -in the existing top bar are repointed at the Bluetooth connect
+          -ion state; the battery pill                                   
+      201 -either shows the phone's battery or goes away.                
+      198 +**Phase 2 — the keyboard.** *Done — see [`hidra/`](hidra/). Bu
+          +ilds; not yet run on hardware.*                               
+      199 +`src/web/` into assets, `transport.js` swapped for the bridge,
+          + WebView wired to `KeyTransport`.                             
+      200 +At this point it is the PWA, minus the ESP32. Status pills in 
+          +the existing top bar are                                      
+      201 +repointed at the Bluetooth connection state; the battery pill 
+          +shows the phone's battery.                                    
+      202  
+      203 +The four shared files are copied from `src/web/` by a Gradle t
+          +ask rather than duplicated, so                                
+      204 +there is no fork to keep in step — verified by editing `src/we
+          +b/app.js` and finding the change                              
+      205 +in the APK. Landscape lock, keep-screen-on and immersive mode 
+          +came along early, because without                             
+      206 +them the keyboard is not testable as a keyboard; the rest of P
+          +hase 3 still stands.                                          
+      207 +                                                              
+      208  **Phase 3 — Android polish.** Landscape lock, immersive mode, 
+           gesture exclusion rects,
+      209  keep-screen-on, release-all on pause, haptic feedback per key,
+            auto-reconnect to the last
+      210  host, optional foreground service.
+
+  Searched for 1 pattern, ran 1 shell command (ctrl+o to expand)
+
+● Phase 2 is done. The app is now the PWA keyboard, typing over BLE.
+
+  The keyboard is not a fork. index.html, style.css, keymap.js and app.js are
+  copied out of src/web/ at build time by a Gradle task — the same files the
+  ESP32 serves. I verified this rather than assuming it: appended a marker to
+  src/web/app.js, rebuilt, found it in the APK, reverted, confirmed src/web/ is
+  clean and back in sync. Edit the layout once, both products get it.
+
+  Only transport.js is Android's own. It declares the same WebSocketTransport
+  class name app.js constructs and bridges to KeyTransport instead of opening a
+  socket, so it shadows the web one by simply not being copied over. app.js is
+  byte-identical in the APK and in page.h — it never learns which host it's on.
+
+  One thing that needed solving. app.js treats an empty location.host as "no
+  device, render a preview" — correct when you open the page from disk, fatal
+  here, since file:///android_asset/ has no host and the keyboard would have
+  rendered dead. So the page is served from a synthetic https://hidra.local/
+  origin via a request interceptor that answers from assets. Nothing touches the
+  network.
+
+  Two Android-only touches, both in assets/transport.js so src/web/ stays
+  host-agnostic: the offline veil reads waiting for a device rather than
+  reconnecting, and the function row folds away on short screens with a toggle
+  in the status bar. That second one is the sizing problem from §6 — a full
+  15-column layout plus function row on the Pixel 2 XL gives roughly 7 mm keys,
+  and hiding the row buys the remaining rows their height back. It defaults to
+  hidden under 450 CSS px of viewport height.
+
+  Landscape lock, keep-screen-on and immersive mode came along early. They're
+  nominally Phase 3, but without them this isn't testable as a keyboard.
+  Rotation no longer tears down the WebView either — it would have dropped the
+  link mid-sentence.
+
+  Verification: clean build, 18 tests green, APK 2.3 MB, all five assets present
+  and the four shared ones byte-identical to src/web/. One build failure along
+  the way worth knowing about if you build in Android Studio:
+  Theme.Material.NoTitleBar.Fullscreen doesn't exist — Material uses
+  NoActionBar.
+
+  Not run on hardware; still no device here. When you install it, the thing I'd
+  watch is key latency and multi-touch chords — shift+letter with two fingers is
+  the case where a WebView could disappoint versus native, and it's the one
+  that would argue for the Compose rewrite in Phase 4.
+
+  android/ is still entirely untracked in git — five phases of work sitting
+  uncommitted. Worth a commit when you're happy with it; say the word and I'll
+  write one.
+
+✻ Baked for 5m 32s
+
+※ recap: You're building HIDRA for Android, turning a Pixel into a Bluetooth keyboard for tablets and Chromebooks. Phase 2 is done and builds clean, so the PWA keyboard now types over BLE. Next: install the APK on the Pixel and test typing latency and multi-touch chords.

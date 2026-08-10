@@ -1,0 +1,50 @@
+09:12:14.594  HIDRA phase 0 spike
+09:12:14.596  device: Google Pixel 2 XL, Android 11 (API 30)
+09:12:14.597  bluetooth available=true enabled=true
+09:12:14.598  HID_DEVICE profile constant present: 19
+09:12:16.477  HOGP probe: opening GATT server…
+09:12:16.485  HOGP probe: addService() returned true (waiting for callback…)
+09:12:16.489  HOGP probe: *** addService(0x1812) SUCCEEDED *** — BLE HID may be possible after all; revisit PLAN.md §1
+09:12:19.633  requesting HID_DEVICE profile proxy…
+09:12:19.653  got HID_DEVICE proxy — registering app…
+09:12:19.659  registerApp() accepted (waiting for onAppStatusChanged)
+09:12:19.663  onAppStatusChanged: registered=true plugged=Pixel 4a/F8:0F:F9:E1:1D:56
+09:12:34.032  requested 300s of discoverability — now pair from tablet B's Bluetooth settings
+09:16:47.710  requested 300s of discoverability — now pair from tablet B's Bluetooth settings
+09:17:36.100  onAppStatusChanged: registered=false plugged=null
+09:22:50.135  connect(Peripheral MK/A8:E6:21:EC:A7:95) -> false
+09:23:04.367  requesting HID_DEVICE profile proxy…
+09:23:04.382  got HID_DEVICE proxy — registering app…
+09:23:04.387  registerApp() accepted (waiting for onAppStatusChanged)
+09:23:04.390  onAppStatusChanged: registered=true plugged=Pixel 4a/F8:0F:F9:E1:1D:56
+09:23:11.765  requested 300s of discoverability — now pair from tablet B's Bluetooth settings
+09:24:14.967  connect(Peripheral MK/A8:E6:21:EC:A7:95) -> true
+09:24:14.974  onConnectionStateChanged: Peripheral MK/A8:E6:21:EC:A7:95 -> connecting
+09:24:15.550  onConnectionStateChanged: Peripheral MK/A8:E6:21:EC:A7:95 -> CONNECTED
+09:24:37.255  down 0x04  00 00 04 00 00 00 00 00  ok 1580us
+09:24:37.284  up   0x04  00 00 00 00 00 00 00 00  ok 1178us
+09:24:41.384  holding 0x04 for 3000ms — expect key repeat on the host
+09:24:41.397  down 0x04  00 00 04 00 00 00 00 00  ok 691us
+09:24:44.411  up   0x04  00 00 00 00 00 00 00 00  ok 7562us
+09:24:48.713  down 0xE1  02 00 00 00 00 00 00 00  ok 920us
+09:24:48.736  down 0x04  02 00 04 00 00 00 00 00  ok 1078us
+09:24:48.783  up   0x04  02 00 00 00 00 00 00 00  ok 839us
+09:24:48.805  up   0xE1  00 00 00 00 00 00 00 00  ok 856us
+09:24:51.832  down 0x0B  00 00 0B 00 00 00 00 00  ok 960us
+09:24:51.857  up   0x0B  00 00 00 00 00 00 00 00  ok 1822us
+09:24:51.893  down 0x0C  00 00 0C 00 00 00 00 00  ok 854us
+09:24:51.923  up   0x0C  00 00 00 00 00 00 00 00  ok 1433us
+09:24:51.953  down 0x07  00 00 07 00 00 00 00 00  ok 2642us
+09:24:51.975  up   0x07  00 00 00 00 00 00 00 00  ok 1151us
+09:24:52.013  down 0x15  00 00 15 00 00 00 00 00  ok 1604us
+09:24:52.037  up   0x15  00 00 00 00 00 00 00 00  ok 1619us
+09:24:52.072  down 0x04  00 00 04 00 00 00 00 00  ok 2016us
+09:24:52.095  up   0x04  00 00 00 00 00 00 00 00  ok 911us
+09:24:55.185  manual release
+09:24:55.197  release all  00 00 00 00 00 00 00 00  ok 1056us
+09:24:58.000  disconnect(Peripheral MK/A8:E6:21:EC:A7:95) -> true
+09:24:58.033  onConnectionStateChanged: Peripheral MK/A8:E6:21:EC:A7:95 -> disconnecting
+09:24:58.140  onConnectionStateChanged: Peripheral MK/A8:E6:21:EC:A7:95 -> disconnected
+09:25:00.532  onAppStatusChanged: registered=false plugged=null
+09:25:00.543  unregistered
+

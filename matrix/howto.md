@@ -57,3 +57,6 @@ ESPAsyncTCP / ESPAsyncWebServer are not in the index, install them from git into
 * The touch button always shows the time and date for 10 s, day or night.
 * The panel fits five characters, so the static clock alternates `HH:MM` and
   `DD.MM.` every two seconds.
+* The OLED switches itself off 30 s after the last wake up and comes back on for
+  another 30 s on a touch. It stays lit in Wi-Fi setup mode, where the AP name
+  and IP have to remain readable.

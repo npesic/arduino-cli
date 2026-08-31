@@ -46,6 +46,7 @@
 #define SCROLL_PASSES     3      // how many times the banner is scrolled
 #define SCROLL_STEP_MS    60     // one pixel step of the scroll
 #define CLOCK_MS          10000  // how long the clock stays on the matrix
+#define OLED_ON_MS        30000  // how long the OLED stays lit after a wake up
 #define INPUT_COOLDOWN_MS 1000   // ignore repeated triggers within this window
 
 #define NIGHT_START_HOUR  22     // night (sleep) time starts at 22:00
@@ -101,6 +102,8 @@ int lastTouch = LOW;
 
 bool timeSynced = false;
 unsigned long lastOled = 0;
+bool oledOn = true;
+unsigned long oledOffAt = 0;
 
 // ---------------------------------------------------------------- pages
 
@@ -321,7 +324,23 @@ void clearCredentials() {
 
 // ---------------------------------------------------------------- OLED
 
+// The panel is switched off with its own command, the buffer is kept as it is.
+void oledWake() {
+  if (!oledOn) {
+    display.ssd1306_command(SSD1306_DISPLAYON);
+    oledOn = true;
+  }
+  oledOffAt = millis() + OLED_ON_MS;
+}
+
+void oledSleep() {
+  if (!oledOn) return;
+  display.ssd1306_command(SSD1306_DISPLAYOFF);
+  oledOn = false;
+}
+
 void oledLines(const String& l1, const String& l2 = "", const String& l3 = "") {
+  oledWake();
   display.clearDisplay();
   display.setCursor(0, 0);
   display.println(l1);
@@ -331,6 +350,10 @@ void oledLines(const String& l1, const String& l2 = "", const String& l3 = "") {
 }
 
 void updateOled() {
+  // In setup mode the screen stays lit, the AP name and IP are needed there.
+  if (!apMode && oledOn && (long)(millis() - oledOffAt) >= 0) oledSleep();
+  if (!oledOn) return;
+
   if (millis() - lastOled < 1000) return;
   lastOled = millis();
   display.clearDisplay();
@@ -571,9 +594,11 @@ void handleInputs() {
 
   bool motion = digitalRead(PIR) == HIGH;
 
-  // The touch button always shows the time and date, whatever the hour is.
+  // The touch button always shows the time and date, whatever the hour is,
+  // and lights the OLED back up for another 30 s.
   if (touched && now - lastTrigger > INPUT_COOLDOWN_MS) {
     lastTrigger = now;
+    oledWake();
     startClock();
     return;
   }
@@ -605,6 +630,7 @@ void setup() {
     Serial.println(F("SSD1306 allocation failed"));
     for (;;);
   }
+  oledWake();
   display.display();
   delay(1000);
   display.clearDisplay();

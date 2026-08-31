@@ -56,7 +56,7 @@
 #define WIFI_FILE   "/wifi.cfg"
 #define WIFI_CONNECT_TIMEOUT_MS 20000
 
-#define MY_TZ  TZ_Europe_Belgrade  // see TZ.h for other zones
+#define MY_TZ  TZ_America_Los_Angeles  // PST/PDT, see TZ.h for other zones
 #define NTP_SERVER_1 "pool.ntp.org"
 #define NTP_SERVER_2 "time.nist.gov"
 

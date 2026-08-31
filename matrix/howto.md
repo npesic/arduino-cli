@@ -48,7 +48,8 @@ ESPAsyncTCP / ESPAsyncWebServer are not in the index, install them from git into
 
 ## Behaviour
 
-* Time is synced over NTP (`pool.ntp.org`, zone `TZ_Europe_Belgrade` in the sketch).
+* Time is synced over NTP (`pool.ntp.org`, zone `TZ_America_Los_Angeles` in the
+  sketch - Pacific time, with the DST switch handled by the zone rules).
 * Night time (22:00-07:00 by default): motion shows only the time and date in
   red, static, for 10 s.
 * Day time: motion scrolls the banner with the current time and date appended,

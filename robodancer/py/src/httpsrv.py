@@ -95,6 +95,19 @@ class Handler(server.BaseHTTPRequestHandler):
             'macros': [] if pt is None else sorted(pt.MACROS),
             'drive': None if pilot is None else pilot.state,
             'ws_port': config.WS_PORT,
+            # Served rather than duplicated in JS, so the browser and the
+            # drone can never disagree about deadzones or button indices.
+            'tuning': {
+                'drive_deadzone': config.DRIVE_DEADZONE,
+                'spin_speed': config.SPIN_SPEED,
+                'invert_steering': config.INVERT_STEERING,
+                'pantilt_deadzone': config.PANTILT_DEADZONE,
+                'deadman_timeout': config.DEADMAN_TIMEOUT,
+                'axes': {'lx': config.AXIS_LX, 'ly': config.AXIS_LY,
+                         'rx': config.AXIS_RX, 'ry': config.AXIS_RY},
+                'buttons': {'up': config.BTN_UP, 'down': config.BTN_DOWN,
+                            'left': config.BTN_LEFT, 'right': config.BTN_RIGHT},
+            },
         })
 
     def _robo(self, path, params):

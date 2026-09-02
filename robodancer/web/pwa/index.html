@@ -2,71 +2,71 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Robodancer - bring-up</title>
-  <style>
-    :root { color-scheme: dark; }
-    body { margin: 0; font: 15px/1.5 system-ui, sans-serif;
-           background: #14161a; color: #e6e8eb; }
-    header { padding: 12px 16px; border-bottom: 1px solid #2a2f37; }
-    h1 { margin: 0; font-size: 16px; font-weight: 600; }
-    .note { color: #9aa4b2; font-size: 13px; margin-top: 2px; }
-    main { padding: 16px; display: grid; gap: 16px;
-           grid-template-columns: minmax(0, 640px) minmax(200px, 1fr); }
-    @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
-    img { width: 100%; background: #000; border: 1px solid #2a2f37;
-          border-radius: 6px; display: block; aspect-ratio: 4/3; }
-    button { font: inherit; padding: 8px 12px; margin: 0 6px 6px 0;
-             background: #232833; color: #e6e8eb; border: 1px solid #39404d;
-             border-radius: 5px; cursor: pointer; }
-    button:hover { background: #2c3340; }
-    pre { background: #1b1f26; border: 1px solid #2a2f37; border-radius: 6px;
-          padding: 10px; font-size: 12px; overflow-x: auto; margin: 0; }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101318">
+  <title>Robodancer</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
 </head>
 <body>
   <header>
-    <h1>Robodancer &mdash; phase 3 bring-up page</h1>
-    <div class="note">Verifies TLS, the MJPEG stream and the /robo/ API.
-      The real PWA (gamepad, driving) replaces this in phase 5.</div>
+    <h1>Robodancer</h1>
+    <span class="pill" id="link"><span class="dot"></span><span>connecting</span></span>
+    <span class="pill" id="pad"><span class="dot"></span><span>no gamepad</span></span>
+    <div class="spacer"></div>
+    <span class="pill"><span class="dot"></span><span id="rtt">-- ms</span></span>
   </header>
+
   <main>
-    <div>
-      <img id="cam" src="/stream.mjpg" alt="camera stream">
+    <div class="video">
+      <img id="cam" alt="camera stream">
+      <div class="crosshair"></div>
     </div>
+
     <div>
-      <div id="buttons"></div>
-      <pre id="out">loading /api/status ...</pre>
+      <div class="panel">
+        <h2>Wheels</h2>
+        <div class="meter">
+          <div class="lbl"><span>left</span><b id="left-val">0.00</b></div>
+          <div class="track"><div class="fill" id="left-fill"></div></div>
+        </div>
+        <div class="meter">
+          <div class="lbl"><span>right</span><b id="right-val">0.00</b></div>
+          <div class="track"><div class="fill" id="right-fill"></div></div>
+        </div>
+        <button id="estop">STOP</button>
+        <p class="hint">Space or Esc also stops. Releasing focus stops.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Camera</h2>
+        <div class="readout">
+          <span>pan</span><b id="pan">--</b>
+          <span>tilt</span><b id="tilt">--</b>
+          <span>deadman trips</span><b id="trips">0</b>
+          <span>pad</span><b id="pad-id">--</b>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Macros</h2>
+        <div class="macros" id="macros"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Controls</h2>
+        <div class="readout">
+          <span>left stick</span><b>drive &amp; steer</b>
+          <span>d-pad</span><b>spin / straight</b>
+          <span>right stick</span><b>aim camera</b>
+        </div>
+        <p class="hint">Press a button on the gamepad if it is not detected &mdash;
+          browsers only expose a pad after it sends input.</p>
+      </div>
     </div>
   </main>
-  <script>
-    const out = document.getElementById('out');
-    const show = (o) => out.textContent = JSON.stringify(o, null, 2);
-
-    async function call(path) {
-      try { show(await (await fetch(path)).json()); }
-      catch (e) { show({ error: String(e) }); }
-    }
-
-    async function init() {
-      let status;
-      try {
-        status = await (await fetch('/api/status')).json();
-      } catch (e) { return show({ error: String(e) }); }
-      show(status);
-      const box = document.getElementById('buttons');
-      for (const name of status.macros || []) {
-        const b = document.createElement('button');
-        b.textContent = name;
-        b.onclick = () => call('/robo/' + name);
-        box.appendChild(b);
-      }
-      const refresh = document.createElement('button');
-      refresh.textContent = 'status';
-      refresh.onclick = () => call('/api/status');
-      box.appendChild(refresh);
-    }
-    init();
-  </script>
 </body>
 </html>

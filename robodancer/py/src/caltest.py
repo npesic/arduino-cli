@@ -7,6 +7,8 @@ Works out the four things wheels.py cannot know from the code alone:
   * which control-byte bit means "forward" for each motor
   * the lowest PWM duty that actually turns the wheels
 
+Step 3 verifies the result by driving both wheels before printing anything.
+
 Prints a config.py block at the end. Nothing is written automatically.
 
     python3 caltest.py                      # guided wizard
@@ -56,7 +58,7 @@ def pulse(w, motor, forward, duty, secs=PULSE):
 
 
 def find_left_motor(w, duty):
-    print('\n=== Step 1/3: which motor is the left wheel? ===')
+    print('\n=== Step 1/4: which motor is the left wheel? ===')
     print('Running M3 alone.')
     input('Press Enter to pulse M3... ')
     pulse(w, 3, True, duty)
@@ -71,21 +73,55 @@ def find_left_motor(w, duty):
 
 
 def find_directions(w, duty):
-    print('\n=== Step 2/3: which bit is forward? ===')
+    print('\n=== Step 2/4: which bit is forward? ===')
+    print('Watch the TOP of the tyre, not the drone. On a stand the drone does')
+    print('not move, so judging "would this drive it forward" is easy to get')
+    print('backwards -- just say which way the top of the tyre travels.')
     result = {}
     for motor in (3, 4):
         print('\nRunning M%d with the FORWARD bit set.' % motor)
         input('Press Enter to pulse M%d... ' % motor)
         pulse(w, motor, True, duty)
-        got = ask('Did that wheel drive the drone forward or backward?', ['f', 'b'])
+        got = ask('Top of the tyre moved toward the FRONT or the BACK?', ['f', 'b'])
         result[motor] = (got == 'f')
         print('  -> M%d forward bit is %s' % (
             motor, 'correct' if result[motor] else 'INVERTED'))
     return result
 
 
+def proposed_bits(directions):
+    """The bit assignment implied by step 2, without touching config."""
+    bits = {
+        3: (config.M3_BIT_FORWARD, config.M3_BIT_REVERSE),
+        4: (config.M4_BIT_FORWARD, config.M4_BIT_REVERSE),
+    }
+    for motor in (3, 4):
+        fwd, rev = bits[motor]
+        bits[motor] = (fwd, rev) if directions[motor] else (rev, fwd)
+    return bits
+
+
+def verify_forward(w, directions, duty):
+    """Drive both motors forward with the proposed bits and confirm. This is
+    the check that catches a mis-answered step 2, where both wheels come out
+    inverted together."""
+    print('\n=== Step 3/4: verify ===')
+    print('Both motors will run FORWARD using the bits just worked out.')
+    input('Press Enter... ')
+    bits = proposed_bits(directions)
+    byte = (1 << bits[3][0]) | (1 << bits[4][0])
+    w.raw_byte(byte, duty, duty)
+    time.sleep(PULSE)
+    w.stop()
+    time.sleep(0.3)
+    if ask('Did BOTH wheels drive the drone forward?', ['y', 'n']) == 'y':
+        return directions
+    print('  -> flipping both motors')
+    return {motor: not value for motor, value in directions.items()}
+
+
 def find_min_duty(w, left_motor):
-    print('\n=== Step 3/3: minimum duty that turns the wheels ===')
+    print('\n=== Step 4/4: minimum duty that turns the wheels ===')
     print('Both motors will run at rising duty. Say yes at the first step where')
     print('BOTH wheels turn steadily (not just buzz or stutter).')
     for duty in RAMP:
@@ -105,12 +141,8 @@ def find_min_duty(w, left_motor):
 def report(left_motor, directions, min_duty):
     # A wheel that ran backward is corrected by swapping that motor's bits,
     # which keeps INVERT_* free for later per-side tweaks.
-    m3_fwd, m3_rev = config.M3_BIT_FORWARD, config.M3_BIT_REVERSE
-    m4_fwd, m4_rev = config.M4_BIT_FORWARD, config.M4_BIT_REVERSE
-    if not directions[3]:
-        m3_fwd, m3_rev = m3_rev, m3_fwd
-    if not directions[4]:
-        m4_fwd, m4_rev = m4_rev, m4_fwd
+    bits = proposed_bits(directions)
+    (m3_fwd, m3_rev), (m4_fwd, m4_rev) = bits[3], bits[4]
 
     print('\n' + '=' * 66)
     print('Paste this into config.py, replacing the matching lines:')
@@ -140,6 +172,7 @@ def report(left_motor, directions, min_duty):
 def wizard(w, duty):
     left_motor = find_left_motor(w, duty)
     directions = find_directions(w, duty)
+    directions = verify_forward(w, directions, duty)
     min_duty = find_min_duty(w, left_motor)
     report(left_motor, directions, min_duty)
 

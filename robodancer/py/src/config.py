@@ -40,9 +40,10 @@ class config:
 # ---------------------------------------------------------------------------
 # Wheel drive tuning (L293D shift-register shield, motors M3 + M4).
 #
-# The direction bits and the left/right assignment below are GUESSES carried
-# over from firmata/M34.py. Run caltest.py on the hardware and replace them
-# with what it prints.
+# Calibrated on the hardware. LEFT_MOTOR and MIN_DUTY come from caltest.py;
+# the direction bits are M34.py's originals, confirmed by a drive test
+# (forward/back and spin direction all correct).
+# Re-run caltest.py if the shield, wiring or motors change.
 # ---------------------------------------------------------------------------
 
 SERIAL_PORT = '/dev/ttyUSB0'
@@ -60,7 +61,7 @@ PIN_PWM_M4 = 'd:5:p'
 # Which physical motor is the left wheel: 3 or 4.
 LEFT_MOTOR = 3
 
-# Control-byte bits, per motor, for forward and reverse. From M34.py.
+# Control-byte bits, per motor, for forward and reverse.
 M3_BIT_FORWARD = 5
 M3_BIT_REVERSE = 7
 M4_BIT_FORWARD = 0
@@ -76,9 +77,9 @@ LATCH_BIT_DELAY = 0.001
 
 # Speed shaping. Below DEADZONE the motors are cut entirely; at and above it
 # the magnitude is remapped onto [MIN_DUTY, MAX_DUTY], because brushed motors
-# just buzz and heat up below roughly 0.3 duty instead of turning.
+# just buzz and heat up below MIN_DUTY instead of turning.
 DEADZONE = 0.08
-MIN_DUTY = 0.35
+MIN_DUTY = 0.50
 MAX_DUTY = 1.0
 
 # Motors stop if no command arrives within this many seconds.

@@ -149,6 +149,19 @@ class Wheels:
             self._pins['pwm3'].write(clamp(pwm3, 0.0, 1.0))
             self._pins['pwm4'].write(clamp(pwm4, 0.0, 1.0))
 
+    def raw_byte(self, byte, pwm3, pwm4):
+        """Drive with an explicit control byte. For calibration only: lets
+        caltest.py verify a proposed bit assignment before it is written to
+        config.py."""
+        with self._lock:
+            if not self._connected:
+                raise RuntimeError('Wheels.connect() not called')
+            if byte != self._latched:
+                self._write_latch(byte)
+                self._latched = byte
+            self._pins['pwm3'].write(clamp(pwm3, 0.0, 1.0))
+            self._pins['pwm4'].write(clamp(pwm4, 0.0, 1.0))
+
     def stop(self):
         with self._lock:
             if not self._connected:

@@ -13,7 +13,7 @@ const ui = {
   leftFill: el('left-fill'), rightFill: el('right-fill'),
   leftVal: el('left-val'), rightVal: el('right-val'),
   pan: el('pan'), tilt: el('tilt'), trips: el('trips'), padId: el('pad-id'),
-  macros: el('macros'), estop: el('estop'), cam: el('cam'),
+  macros: el('macros'), estop: el('estop'), cam: el('cam'), fs: el('fs'),
 };
 
 let tuning = DEFAULT_TUNING;
@@ -132,8 +132,25 @@ function stop() {
 
 async function init() {
   ui.estop.addEventListener('click', stop);
+
+  const toggleFs = () => {
+    const on = document.body.classList.toggle('fs');
+    if (on && document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else if (!on && document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+  ui.fs.addEventListener('click', toggleFs);
+  // Leaving fullscreen by any route (Esc, gesture) must clear the class too.
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) document.body.classList.remove('fs');
+  });
+
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'Escape') { e.preventDefault(); stop(); }
+    if (e.code === 'Space') { e.preventDefault(); stop(); }
+    else if (e.code === 'Escape') { stop(); }
+    else if (e.code === 'KeyF') { toggleFs(); }
   });
   // Losing focus means the gamepad stops being read, so stop moving too.
   window.addEventListener('blur', stop);

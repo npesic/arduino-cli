@@ -9,9 +9,13 @@
   --good: #35c98a;
   --warn: #e8b339;
   --bad: #e8574a;
+  --header-h: 49px;
+  --gap: 14px;
 }
 
 * { box-sizing: border-box; }
+
+html, body { height: 100%; }
 
 body {
   margin: 0;
@@ -57,12 +61,23 @@ h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: .2px; }
 
 main {
   display: grid;
-  gap: 14px;
-  padding: 14px;
+  gap: var(--gap);
+  padding: var(--gap);
   grid-template-columns: minmax(0, 1fr) 320px;
   align-items: start;
+  /* Fit the viewport: the video is sized by the height left over, not by
+     width alone, so the page never scrolls while driving. */
+  height: calc(100vh - var(--header-h));
+  height: calc(100dvh - var(--header-h));
 }
-@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+
+/* Explicit units, not 100%: a percentage height against a grid area with
+   align-items:start does not resolve reliably. */
+.side {
+  max-height: calc(100vh - var(--header-h) - var(--gap) * 2);
+  max-height: calc(100dvh - var(--header-h) - var(--gap) * 2);
+  overflow-y: auto;
+}
 
 .video {
   position: relative;
@@ -70,8 +85,25 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
+  display: flex;
+  max-height: 100%;
 }
-.video img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.video img {
+  display: block;
+  width: 100%;
+  max-height: calc(100vh - var(--header-h) - var(--gap) * 2);
+  max-height: calc(100dvh - var(--header-h) - var(--gap) * 2);
+  /* contain, not cover: letterbox rather than crop the camera's view. */
+  object-fit: contain;
+  margin: auto;
+}
+
+/* Narrow screens go back to natural flow and normal scrolling. */
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; height: auto; }
+  .side { max-height: none; overflow: visible; }
+  .video img { max-height: 60vh; }
+}
 .video .crosshair {
   position: absolute; inset: 0; pointer-events: none;
   background:
@@ -146,6 +178,15 @@ button:active { transform: translateY(1px); }
   color: #ffb4ad;
 }
 #estop:hover { background: #4a201d; }
+
+#fs { padding: 4px 9px; font-size: 13px; line-height: 1; }
+
+/* Fullscreen: video only, panels hidden. */
+body.fs main { grid-template-columns: 1fr; }
+body.fs .side, body.fs header { display: none; }
+body.fs main { height: 100vh; height: 100dvh; padding: 0; }
+body.fs .video { border: 0; border-radius: 0; }
+body.fs .video img { max-height: 100vh; max-height: 100dvh; }
 
 .hint { margin: 8px 0 0; font-size: 12px; color: var(--dim); }
 code {

@@ -82,6 +82,7 @@ class Handler(server.BaseHTTPRequestHandler):
     def _status(self):
         cam = self.server.camera
         pt = self.server.pantilt
+        pilot = self.server.pilot
         self._json({
             'ok': True,
             'camera': None if cam is None else {
@@ -92,9 +93,29 @@ class Handler(server.BaseHTTPRequestHandler):
             'pantilt': None if pt is None else {
                 'pan': pt.position[0], 'tilt': pt.position[1]},
             'macros': [] if pt is None else sorted(pt.MACROS),
+            'drive': None if pilot is None else pilot.state,
+            'ws_port': config.WS_PORT,
         })
 
     def _robo(self, path, params):
+        name = path.rstrip('/').rsplit('/', 1)[-1]
+        # An emergency stop must not depend on the WebSocket being healthy.
+        if name == 'stop':
+            if self.server.pilot is None:
+                self._json({'ok': False, 'error': 'drive not running'}, 503)
+            else:
+                self.server.pilot.stop('http request')
+                self._json({'ok': True, 'path': path, 'stopped': True})
+            return
+        if name == 'drive':
+            if self.server.pilot is None:
+                self._json({'ok': False, 'error': 'drive not running'}, 503)
+                return
+            left = float(params.get('left', [0])[0])
+            right = float(params.get('right', [0])[0])
+            self.server.pilot.drive(left, right)
+            self._json({'ok': True, 'path': path, 'left': left, 'right': right})
+            return
         if self.server.pantilt is None:
             self._json({'ok': False, 'error': 'pantilt not running'}, 503)
             return
@@ -170,10 +191,11 @@ class DroneHTTPServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address, camera=None, pantilt=None):
+    def __init__(self, address, camera=None, pantilt=None, pilot=None):
         super().__init__(address, Handler)
         self.camera = camera
         self.pantilt = pantilt
+        self.pilot = pilot
 
 
 def ssl_context(cert_file=None, key_file=None):
@@ -188,9 +210,10 @@ def ssl_context(cert_file=None, key_file=None):
     return ctx
 
 
-def create(camera=None, pantilt=None, port=None, tls=True):
+def create(camera=None, pantilt=None, pilot=None, port=None, tls=True):
     port = port or config.HTTP_PORT
-    httpd = DroneHTTPServer(('', port), camera=camera, pantilt=pantilt)
+    httpd = DroneHTTPServer(('', port), camera=camera, pantilt=pantilt,
+                            pilot=pilot)
     if tls:
         httpd.socket = ssl_context().wrap_socket(httpd.socket, server_side=True)
     return httpd

@@ -146,3 +146,25 @@ CAM_FRAMERATE  = 24
 
 # Drop a streaming client that has seen no frame for this long.
 CAM_FRAME_TIMEOUT = 5.0
+
+
+# ---------------------------------------------------------------------------
+# Driving: stick mixing and d-pad spins.
+# ---------------------------------------------------------------------------
+
+# Left-stick magnitude below which the wheels are cut.
+DRIVE_DEADZONE = 0.15
+
+# Wheel speed used by the d-pad spins, 0..1.
+SPIN_SPEED = 0.8
+
+# PROMPT.md specifies full-left = "left wheel full speed, right wheel zero",
+# which rotates the drone clockwise -- i.e. pushing the stick left turns it
+# RIGHT. Set this True to swap the two halves if that reads backwards.
+INVERT_STEERING = False
+
+# Standard Gamepad API button indices for the d-pad.
+BTN_UP, BTN_DOWN, BTN_LEFT, BTN_RIGHT = 12, 13, 14, 15
+
+# Gamepad axis indices: left stick X/Y, right stick X/Y.
+AXIS_LX, AXIS_LY, AXIS_RX, AXIS_RY = 0, 1, 2, 3

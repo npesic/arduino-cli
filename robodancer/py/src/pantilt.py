@@ -105,6 +105,34 @@ class PanTilt:
                                               config.INVERT_TILT))
         return pan, tilt
 
+    # Macros were written against a nominal 20..160 sweep centred on 90.
+    # Rather than rewrite every literal for each gimbal, they are mapped onto
+    # the measured travel at runtime, preserving their shape.
+    NOM_MIN, NOM_MID, NOM_MAX = 20.0, 90.0, 160.0
+
+    @classmethod
+    def _map(cls, nominal, low, mid, high):
+        """Map a nominal angle onto a measured range, keeping the centre fixed.
+
+        Each half is scaled independently, so an asymmetric range (this tilt
+        axis has 40 degrees of travel one way and 45 the other) does not skew
+        the motion around centre.
+        """
+        nominal = clamp(float(nominal), cls.NOM_MIN, cls.NOM_MAX)
+        if nominal >= cls.NOM_MID:
+            frac = (nominal - cls.NOM_MID) / (cls.NOM_MAX - cls.NOM_MID)
+            return mid + frac * (high - mid)
+        frac = (cls.NOM_MID - nominal) / (cls.NOM_MID - cls.NOM_MIN)
+        return mid - frac * (mid - low)
+
+    @classmethod
+    def map_pan(cls, nominal):
+        return cls._map(nominal, config.PAN_MIN, config.PAN_CENTER, config.PAN_MAX)
+
+    @classmethod
+    def map_tilt(cls, nominal):
+        return cls._map(nominal, config.TILT_MIN, config.TILT_CENTER, config.TILT_MAX)
+
     # -- manual control -----------------------------------------------------
 
     @property
@@ -155,13 +183,19 @@ class PanTilt:
 
     # -- macros -------------------------------------------------------------
 
+    def _pt(self, channel, nominal, delay=0.0):
+        """One macro step, with the nominal angle mapped onto real travel."""
+        angle = (self.map_pan(nominal) if channel == config.CH_PAN
+                 else self.map_tilt(nominal))
+        return (channel, angle, delay)
+
     def _sweep(self, channel, start, stop, step, delay=0.05):
         for angle in range(start, stop, step):
-            yield (channel, angle, delay)
+            yield self._pt(channel, angle, delay)
 
     def _m_center(self):
-        yield (config.CH_PAN, config.PAN_CENTER, 0)
-        yield (config.CH_TILT, config.TILT_CENTER, 0)
+        yield self._pt(config.CH_PAN, self.NOM_MID)
+        yield self._pt(config.CH_TILT, self.NOM_MID)
 
     def _m_node_no(self):
         for item in self._m_center():
@@ -199,8 +233,8 @@ class PanTilt:
         for item in self._m_center():
             yield item
         for angle in range(90, 20, -3):
-            yield (config.CH_PAN, angle, 0)
-            yield (config.CH_TILT, 180 - angle, 0.05)
+            yield self._pt(config.CH_PAN, angle)
+            yield self._pt(config.CH_TILT, 180 - angle, 0.05)
         # robo.py had range(160, 20, 3) here, which is empty and silently
         # skipped this phase; the step has to be negative to count down.
         for item in self._sweep(config.CH_TILT, 160, 20, -3):
@@ -208,16 +242,16 @@ class PanTilt:
         for item in self._sweep(config.CH_PAN, 20, 160, 3):
             yield item
         for angle in range(160, 90, -3):
-            yield (config.CH_PAN, angle, 0)
-            yield (config.CH_TILT, angle, 0.05)
+            yield self._pt(config.CH_PAN, angle)
+            yield self._pt(config.CH_TILT, angle, 0.05)
 
     def _m_search(self):
         corners = [(90, 90), (40, 90), (40, 40), (90, 40), (130, 40),
                    (130, 90), (130, 130), (90, 130), (90, 90), (40, 90),
                    (90, 90)]
         for pan, tilt in corners:
-            yield (config.CH_PAN, pan, 0)
-            yield (config.CH_TILT, tilt, 0.5)
+            yield self._pt(config.CH_PAN, pan)
+            yield self._pt(config.CH_TILT, tilt, 0.5)
 
     MACROS = {
         'center':    '_m_center',
@@ -328,19 +362,38 @@ def _selftest():
     print('-- stick integration (pan %.0f deg/s, deadzone %.2f, invert p/t %s/%s)' % (
         config.PAN_RATE, config.PANTILT_DEADZONE,
         config.INVERT_PAN, config.INVERT_TILT))
-    check('deadzone holds still', PanTilt.step(90, 90, 0.05, 0.0, 1.0), (90, 90))
-    pan, _ = PanTilt.step(90, 90, 1.0, 0.0, 1.0)
-    check('full deflection for 1s', round(pan - 90, 1),
-          round(pan_sign * config.PAN_RATE, 1))
-    pan, _ = PanTilt.step(90, 90, -1.0, 0.0, 10.0)
+    # Start from the measured centres, and use a short step so a full-rate
+    # push does not reach a travel limit and mask the direction being tested.
+    p0, t0 = float(config.PAN_CENTER), float(config.TILT_CENTER)
+    dt = 0.5
+    check('deadzone holds still', PanTilt.step(p0, t0, 0.05, 0.0, 1.0), (p0, t0))
+    pan, _ = PanTilt.step(p0, t0, 1.0, 0.0, dt)
+    check('aim-right for %.1fs' % dt, round(pan - p0, 1),
+          round(pan_sign * config.PAN_RATE * dt, 1))
+    _, tilt = PanTilt.step(p0, t0, 0.0, -1.0, dt)
+    check('aim-down is the opposite direction', round(tilt - t0, 1),
+          round(-tilt_sign * config.TILT_RATE * dt, 1))
+    pan, _ = PanTilt.step(p0, t0, -1.0, 0.0, 10.0)
     check('sustained aim-left hits a limit', pan,
           config.PAN_MAX if config.INVERT_PAN else config.PAN_MIN)
-    _, tilt = PanTilt.step(90, 90, 0.0, 1.0, 10.0)
+    _, tilt = PanTilt.step(p0, t0, 0.0, 1.0, 10.0)
     check('sustained aim-up hits a limit', tilt,
           config.TILT_MIN if config.INVERT_TILT else config.TILT_MAX)
-    _, tilt = PanTilt.step(90, 90, 0.0, -1.0, 1.0)
-    check('aim-down is the opposite direction', round(tilt - 90, 1),
-          round(-tilt_sign * config.TILT_RATE, 1))
+
+    print('-- nominal->measured mapping (pan %d/%d/%d, tilt %d/%d/%d)' % (
+        config.PAN_MIN, config.PAN_CENTER, config.PAN_MAX,
+        config.TILT_MIN, config.TILT_CENTER, config.TILT_MAX))
+    check('pan nominal min -> PAN_MIN', PanTilt.map_pan(20), config.PAN_MIN)
+    check('pan nominal mid -> PAN_CENTER', PanTilt.map_pan(90), config.PAN_CENTER)
+    check('pan nominal max -> PAN_MAX', PanTilt.map_pan(160), config.PAN_MAX)
+    check('tilt nominal min -> TILT_MIN', PanTilt.map_tilt(20), config.TILT_MIN)
+    check('tilt nominal mid -> TILT_CENTER', PanTilt.map_tilt(90), config.TILT_CENTER)
+    check('tilt nominal max -> TILT_MAX', PanTilt.map_tilt(160), config.TILT_MAX)
+    check('tilt halves scale independently',
+          (round(PanTilt.map_tilt(55), 2), round(PanTilt.map_tilt(125), 2)),
+          (round((config.TILT_CENTER + config.TILT_MIN) / 2.0, 2),
+           round((config.TILT_CENTER + config.TILT_MAX) / 2.0, 2)))
+    check('out-of-range nominal clamps', PanTilt.map_tilt(999), config.TILT_MAX)
 
     print('-- macros')
     pt = PanTilt(pwm=object())

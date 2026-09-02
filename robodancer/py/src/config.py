@@ -97,13 +97,14 @@ DEADMAN_TIMEOUT = 0.4
 CH_PAN  = 1        # left/right
 CH_TILT = 0        # up/down
 
-PAN_CENTER  = 90
-TILT_CENTER = 90
+PAN_CENTER  = 70
+TILT_CENTER = 50
 
-# Travel limits. robo.py's macros stayed inside 20..160; going further risks
-# the servo hitting its mechanical stop and stalling.
-PAN_MIN,  PAN_MAX  = 20, 160
-TILT_MIN, TILT_MAX = 20, 160
+# Travel limits, measured with `pantilt.py --range`. This gimbal does not
+# use the driver's full 0..180 arc, and tilt is asymmetric about centre
+# (40 degrees down, 45 up). Macros are mapped onto this range at runtime.
+PAN_MIN,  PAN_MAX  = 10, 130
+TILT_MIN, TILT_MAX = 10, 95
 
 # Confirmed with `pantilt.py --check`: on this gimbal a RISING servo angle
 # aims the camera left and down, so both axes are inverted.

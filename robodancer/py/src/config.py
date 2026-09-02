@@ -105,9 +105,10 @@ TILT_CENTER = 90
 PAN_MIN,  PAN_MAX  = 20, 160
 TILT_MIN, TILT_MAX = 20, 160
 
-# Set True if the right stick moves the camera the wrong way.
-INVERT_PAN  = False
-INVERT_TILT = False
+# Confirmed with `pantilt.py --check`: on this gimbal a RISING servo angle
+# aims the camera left and down, so both axes are inverted.
+INVERT_PAN  = True
+INVERT_TILT = True
 
 # Right-stick sensitivity, in degrees per second at full deflection.
 PAN_RATE  = 70.0
@@ -115,3 +116,32 @@ TILT_RATE = 50.0
 
 # Stick magnitude below which the camera holds still.
 PANTILT_DEADZONE = 0.12
+
+
+# ---------------------------------------------------------------------------
+# Servers, TLS and camera.
+#
+# The Gamepad API only works in a secure context, so the PWA has to be served
+# over HTTPS -- and hosting it elsewhere does not help, because the fetch back
+# to the drone would then be blocked as mixed content. TLS terminates here.
+# ---------------------------------------------------------------------------
+
+import os as _os
+
+HTTP_PORT = 9081        # HTTPS: PWA, /robo/*, /stream.mjpg
+WS_PORT   = 9082        # WSS: live driving commands (phase 4)
+
+_SRC_DIR = _os.path.dirname(_os.path.abspath(__file__))
+
+WEB_ROOT  = _os.path.normpath(_os.path.join(_SRC_DIR, '..', '..', 'web', 'pwa'))
+CERT_FILE = _os.path.join(_SRC_DIR, 'certs', 'cert.pem')
+KEY_FILE  = _os.path.join(_SRC_DIR, 'certs', 'key.pem')
+
+# Camera. 640x480 at 24fps is proven on this Pi Zero W with an adequate power
+# supply; drop to 15fps or 480x360 first if control latency suffers, since the
+# stream is the part that can degrade gracefully.
+CAM_RESOLUTION = '640x480'
+CAM_FRAMERATE  = 24
+
+# Drop a streaming client that has seen no frame for this long.
+CAM_FRAME_TIMEOUT = 5.0

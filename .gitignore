@@ -1,0 +1,8 @@
+
+# robodancer: TLS material is per-device and must never be committed
+robodancer/py/src/certs/
+*.pem
+
+# compiled bytecode -- a stale .pyc on the target looks exactly like a bug
+__pycache__/
+*.pyc

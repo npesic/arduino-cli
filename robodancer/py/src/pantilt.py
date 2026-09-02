@@ -134,6 +134,22 @@ class PanTilt:
                 return self._pan, self._tilt
         return self.set(pan, tilt)
 
+    def raw_angle(self, channel, angle):
+        """Write a servo angle bypassing the configured limits.
+
+        For range-finding only: the limits are what we are trying to discover,
+        so they cannot be enforced yet. Still bounded to 0..180, which is all
+        PCA9685.setRotationAngle accepts.
+        """
+        angle = clamp(float(angle), 0.0, 180.0)
+        with self._lock:
+            self._apply(channel, angle)
+            if channel == config.CH_PAN:
+                self._pan = angle
+            else:
+                self._tilt = angle
+            return angle
+
     def center(self):
         return self.set(config.PAN_CENTER, config.TILT_CENTER)
 
@@ -304,15 +320,27 @@ def _selftest():
     check('pan above max', PanTilt.clamp_pan(999), config.PAN_MAX)
     check('tilt in range', PanTilt.clamp_tilt(90), 90)
 
-    print('-- stick integration (pan %.0f deg/s, deadzone %.2f)' % (
-        config.PAN_RATE, config.PANTILT_DEADZONE))
+    # Expectations follow the INVERT_* flags: positive axis_pan always aims
+    # the camera RIGHT, but whether that raises or lowers the servo angle is
+    # a property of the gimbal.
+    pan_sign = -1.0 if config.INVERT_PAN else 1.0
+    tilt_sign = -1.0 if config.INVERT_TILT else 1.0
+    print('-- stick integration (pan %.0f deg/s, deadzone %.2f, invert p/t %s/%s)' % (
+        config.PAN_RATE, config.PANTILT_DEADZONE,
+        config.INVERT_PAN, config.INVERT_TILT))
     check('deadzone holds still', PanTilt.step(90, 90, 0.05, 0.0, 1.0), (90, 90))
     pan, _ = PanTilt.step(90, 90, 1.0, 0.0, 1.0)
-    check('full deflection for 1s', round(pan - 90, 1), round(config.PAN_RATE, 1))
+    check('full deflection for 1s', round(pan - 90, 1),
+          round(pan_sign * config.PAN_RATE, 1))
     pan, _ = PanTilt.step(90, 90, -1.0, 0.0, 10.0)
-    check('long push clamps at min', pan, config.PAN_MIN)
+    check('sustained aim-left hits a limit', pan,
+          config.PAN_MAX if config.INVERT_PAN else config.PAN_MIN)
     _, tilt = PanTilt.step(90, 90, 0.0, 1.0, 10.0)
-    check('tilt clamps at max', tilt, config.TILT_MAX)
+    check('sustained aim-up hits a limit', tilt,
+          config.TILT_MIN if config.INVERT_TILT else config.TILT_MAX)
+    _, tilt = PanTilt.step(90, 90, 0.0, -1.0, 1.0)
+    check('aim-down is the opposite direction', round(tilt - 90, 1),
+          round(-tilt_sign * config.TILT_RATE, 1))
 
     print('-- macros')
     pt = PanTilt(pwm=object())
@@ -403,12 +431,120 @@ def _check():
     return 0
 
 
+AXES = [
+    ('TILT', 'CH_TILT', 'TILT_MIN', 'TILT_MAX', 'TILT_CENTER',
+     'smallest angle (camera highest)', 'largest angle (camera lowest)',
+     'camera level, looking straight ahead'),
+    ('PAN', 'CH_PAN', 'PAN_MIN', 'PAN_MAX', 'PAN_CENTER',
+     'smallest angle (camera fully one way)', 'largest angle (fully the other)',
+     'camera pointing straight forward'),
+]
+
+_RANGE_HELP = """
+Commands:
+  <number>   move to that absolute angle (0-180)
+  +N  -N     move by N degrees
+  a          record the current angle as this axis's LOW end
+  b          record the current angle as this axis's HIGH end
+  c          record the current angle as this axis's CENTRE
+  s          show what has been recorded so far
+  n          done with this axis, move on
+  q          quit without printing
+
+Do not leave the servo parked against a mechanical stop -- if it buzzes or
+strains, move back immediately. That is a stalled servo drawing full current.
+"""
+
+
+def _range_axis(pt, label, channel, lo_desc, hi_desc, mid_desc):
+    print('\n' + '=' * 66)
+    print('%s axis' % label)
+    print('=' * 66)
+    print('  LOW    = %s' % lo_desc)
+    print('  HIGH   = %s' % hi_desc)
+    print('  CENTRE = %s' % mid_desc)
+    print(_RANGE_HELP)
+
+    angle = 90.0
+    pt.raw_angle(channel, angle)
+    found = {}
+    while True:
+        try:
+            raw = input('%s %5.1f deg > ' % (label.lower(), angle)).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            raise SystemExit('Aborted.')
+        if not raw:
+            continue
+        if raw == 'q':
+            raise SystemExit('Aborted.')
+        if raw == 'n':
+            missing = [k for k in ('low', 'high', 'centre') if k not in found]
+            if missing:
+                print('  still missing: %s' % ', '.join(missing))
+                continue
+            return found
+        if raw == 's':
+            print('  %s' % (found or 'nothing recorded yet'))
+            continue
+        if raw in ('a', 'b', 'c'):
+            key = {'a': 'low', 'b': 'high', 'c': 'centre'}[raw]
+            found[key] = int(round(angle))
+            print('  %s = %d' % (key, found[key]))
+            continue
+        try:
+            angle = angle + float(raw) if raw[0] in '+-' else float(raw)
+        except ValueError:
+            print('  not a number or a command; see the list above')
+            continue
+        angle = pt.raw_angle(channel, angle)
+
+
+def _range():
+    """Interactively find each servo's usable travel and true centre."""
+    logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
+    print('Servo range finder. Limits are NOT enforced -- that is the point.')
+    print('Move in small steps near the ends.')
+    if _ask('\nReady?', ['y', 'n']) != 'y':
+        return 1
+
+    results = {}
+    with PanTilt() as pt:
+        for label, ch_name, _, _, _, lo, hi, mid in AXES:
+            results[label] = _range_axis(pt, label, getattr(config, ch_name),
+                                         lo, hi, mid)
+        centre_tilt = results['TILT']['centre']
+        centre_pan = results['PAN']['centre']
+        print('\nReturning to the recorded centre...')
+        pt.raw_angle(config.CH_TILT, centre_tilt)
+        pt.raw_angle(config.CH_PAN, centre_pan)
+        time.sleep(1.0)
+        if _ask('Is the camera level and facing forward now?', ['y', 'n']) != 'y':
+            print('Re-run and pick a different centre.')
+
+    print('\n' + '=' * 66)
+    print('Paste into config.py:')
+    print('=' * 66)
+    for label, _, min_name, max_name, mid_name, _, _, _ in AXES:
+        got = results[label]
+        lo, hi = sorted((got['low'], got['high']))
+        print('%-12s = %d' % (min_name, lo))
+        print('%-12s = %d' % (max_name, hi))
+        print('%-12s = %d' % (mid_name, got['centre']))
+        print()
+    print('=' * 66)
+    return 0
+
+
 if __name__ == '__main__':
     import sys
     if '--selftest' in sys.argv:
         sys.exit(_selftest())
     if '--check' in sys.argv:
         sys.exit(_check())
+    if '--range' in sys.argv:
+        sys.exit(_range())
     print(__doc__)
     print('  --selftest   geometry checks, no hardware needed')
     print('  --check      servo direction + non-blocking check, on the Pi')
+    print('  --range      find each servo\'s usable travel and centre')

@@ -159,8 +159,16 @@ async function init() {
   requestAnimationFrame(loop);
 
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(
-      (e) => console.warn('sw registration failed', e));
+    // Chrome refuses to register a service worker from an origin with a
+    // certificate error, even after the interstitial is accepted. That costs
+    // offline caching and PWA install; everything else works regardless.
+    navigator.serviceWorker.register('/sw.js').catch((e) => {
+      const selfSigned = String(e).includes('SSL certificate error');
+      console.warn(selfSigned
+        ? 'Service worker skipped: self-signed certificate. Driving is unaffected; ' +
+          'trust the CA (see gencert.sh -ca) to enable offline mode and install.'
+        : 'sw registration failed: ' + e);
+    });
   }
 }
 

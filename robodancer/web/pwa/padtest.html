@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robodancer - gamepad diagnostics</title>
+  <style>
+    body { margin: 0; padding: 16px; background: #101318; color: #e7eaee;
+           font: 14px/1.5 system-ui, sans-serif; }
+    h1 { font-size: 16px; margin: 0 0 4px; }
+    p.sub { color: #939eae; margin: 0 0 16px; font-size: 13px; }
+    table { border-collapse: collapse; width: 100%; max-width: 760px; margin-bottom: 16px; }
+    td { padding: 5px 8px; border-bottom: 1px solid #262c36; vertical-align: top; }
+    td:first-child { color: #939eae; width: 230px; }
+    b { font-weight: 600; }
+    .yes { color: #35c98a; } .no { color: #e8574a; } .warn { color: #e8b339; }
+    pre { background: #171b22; border: 1px solid #262c36; border-radius: 6px;
+          padding: 10px; overflow-x: auto; font-size: 12px; max-width: 760px; }
+    .big { font-size: 20px; padding: 14px; background: #171b22;
+           border: 1px solid #262c36; border-radius: 8px; max-width: 760px; }
+  </style>
+</head>
+<body>
+  <h1>Gamepad diagnostics</h1>
+  <p class="sub">Click this page once, then press a button on the gamepad.
+     Browsers hide a pad until it sends input to a focused page.</p>
+
+  <div class="big" id="verdict">waiting for input...</div>
+  <table id="env"></table>
+  <pre id="raw">no gamepad seen yet</pre>
+
+  <script>
+    var envRows = [
+      ['page URL', location.href],
+      ['isSecureContext', window.isSecureContext],
+      ['navigator.getGamepads exists', typeof navigator.getGamepads === 'function'],
+      ['userAgent', navigator.userAgent]
+    ];
+    var seenConnect = null, everSaw = false;
+
+    function cls(v) { return v === true ? 'yes' : (v === false ? 'no' : ''); }
+
+    function renderEnv() {
+      var rows = envRows.concat([
+        ['gamepadconnected fired', seenConnect || false],
+        ['pads in getGamepads()', padCount()]
+      ]);
+      document.getElementById('env').innerHTML = rows.map(function (r) {
+        return '<tr><td>' + r[0] + '</td><td class="' + cls(r[1]) +
+               '"><b>' + String(r[1]) + '</b></td></tr>';
+      }).join('');
+    }
+
+    function padCount() {
+      if (typeof navigator.getGamepads !== 'function') return 'n/a';
+      var pads = navigator.getGamepads(), n = 0;
+      for (var i = 0; i < pads.length; i++) if (pads[i]) n++;
+      return n + ' of ' + pads.length + ' slots';
+    }
+
+    window.addEventListener('gamepadconnected', function (e) {
+      seenConnect = e.gamepad.id;
+      renderEnv();
+    });
+    window.addEventListener('gamepaddisconnected', function () {
+      seenConnect = 'disconnected';
+      renderEnv();
+    });
+
+    function tick() {
+      var pads = typeof navigator.getGamepads === 'function'
+                 ? navigator.getGamepads() : [];
+      var pad = null;
+      for (var i = 0; i < pads.length; i++) if (pads[i]) { pad = pads[i]; break; }
+
+      var v = document.getElementById('verdict');
+      if (pad) {
+        everSaw = true;
+        v.innerHTML = '<span class="yes">GAMEPAD VISIBLE</span> &mdash; ' + pad.id;
+        var pressed = [];
+        for (var b = 0; b < pad.buttons.length; b++)
+          if (pad.buttons[b].pressed) pressed.push(b);
+        document.getElementById('raw').textContent =
+          'id       : ' + pad.id + '\n' +
+          'index    : ' + pad.index + '\n' +
+          'mapping  : ' + (pad.mapping || '(none - non-standard layout)') + '\n' +
+          'axes     : ' + Array.prototype.map.call(
+              pad.axes, function (a) { return a.toFixed(2); }).join('  ') + '\n' +
+          'buttons  : ' + pad.buttons.length + ' total\n' +
+          'pressed  : ' + (pressed.length ? pressed.join(', ') : '(none)') + '\n' +
+          '\nExpected for this app: axes 0,1 = left stick, 2,3 = right stick,\n' +
+          'buttons 12,13,14,15 = d-pad up,down,left,right, mapping "standard".';
+      } else if (!everSaw) {
+        v.innerHTML = '<span class="warn">NO GAMEPAD YET</span> &mdash; ' +
+                      'click this page, then press a button on the pad';
+      } else {
+        v.innerHTML = '<span class="no">GAMEPAD LOST</span>';
+      }
+      renderEnv();
+      requestAnimationFrame(tick);
+    }
+    renderEnv();
+    tick();
+  </script>
+</body>
+</html>

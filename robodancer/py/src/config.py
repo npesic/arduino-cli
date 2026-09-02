@@ -86,3 +86,32 @@ MAX_DUTY = 1.0
 
 # Motors stop if no command arrives within this many seconds.
 DEADMAN_TIMEOUT = 0.4
+
+
+# ---------------------------------------------------------------------------
+# Pan-tilt tuning (PCA9685 servo driver).
+#
+# Channel assignment matches robo.py and angle-test.py.
+# ---------------------------------------------------------------------------
+
+CH_PAN  = 1        # left/right
+CH_TILT = 0        # up/down
+
+PAN_CENTER  = 90
+TILT_CENTER = 90
+
+# Travel limits. robo.py's macros stayed inside 20..160; going further risks
+# the servo hitting its mechanical stop and stalling.
+PAN_MIN,  PAN_MAX  = 20, 160
+TILT_MIN, TILT_MAX = 20, 160
+
+# Set True if the right stick moves the camera the wrong way.
+INVERT_PAN  = False
+INVERT_TILT = False
+
+# Right-stick sensitivity, in degrees per second at full deflection.
+PAN_RATE  = 70.0
+TILT_RATE = 50.0
+
+# Stick magnitude below which the camera holds still.
+PANTILT_DEADZONE = 0.12

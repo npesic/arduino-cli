@@ -40,9 +40,11 @@ class config:
 # ---------------------------------------------------------------------------
 # Wheel drive tuning (L293D shift-register shield, motors M3 + M4).
 #
-# Calibrated on the hardware. LEFT_MOTOR and MIN_DUTY come from caltest.py;
-# the direction bits are M34.py's originals, confirmed by a drive test
-# (forward/back and spin direction all correct).
+# Calibrated on the hardware and confirmed with dirtest.py:
+#   byte 192 (M3 bit7 + M4 bit6) = forward
+#   byte  33 (M3 bit5 + M4 bit0) = backward
+#   byte 129 (M3 bit7 + M4 bit0) = spin right
+#   byte  96 (M3 bit5 + M4 bit6) = spin left
 # Re-run caltest.py if the shield, wiring or motors change.
 # ---------------------------------------------------------------------------
 
@@ -62,10 +64,10 @@ PIN_PWM_M4 = 'd:5:p'
 LEFT_MOTOR = 3
 
 # Control-byte bits, per motor, for forward and reverse.
-M3_BIT_FORWARD = 5
-M3_BIT_REVERSE = 7
-M4_BIT_FORWARD = 0
-M4_BIT_REVERSE = 6
+M3_BIT_FORWARD = 7
+M3_BIT_REVERSE = 5
+M4_BIT_FORWARD = 6
+M4_BIT_REVERSE = 0
 
 # Set True if a wheel spins the wrong way once LEFT_MOTOR is correct.
 INVERT_LEFT  = False
